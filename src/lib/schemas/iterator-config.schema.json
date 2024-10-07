@@ -1,0 +1,20 @@
+{
+  "type": [
+    "object",
+    "null"
+  ],
+  "properties": {
+    "source": {
+      "type": "string"
+    },
+    "as": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "source",
+    "as"
+  ],
+  "$id": "https://ruleforge-docs.onrender.com/schemas/iterator-config.schema.json",
+  "title": "Iterator config"
+}

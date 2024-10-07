@@ -1,0 +1,150 @@
+{
+  "type": [
+    "object",
+    "null"
+  ],
+  "properties": {
+    "source": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "request",
+            "context",
+            "literal"
+          ]
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "literal": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "compare": {
+      "type": "object",
+      "properties": {
+        "operator": {
+          "enum": [
+            "equals",
+            "not_equals",
+            "before",
+            "after",
+            "between",
+            "not_between",
+            "within_last",
+            "within_next",
+            "is_null"
+          ]
+        },
+        "granularity": {
+          "enum": [
+            "datetime",
+            "date",
+            "time"
+          ],
+          "default": "datetime"
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "from": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "to": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "amount": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "default": null
+        },
+        "unit": {
+          "enum": [
+            "minutes",
+            "hours",
+            "days",
+            "weeks",
+            "months",
+            null
+          ],
+          "default": null
+        },
+        "timezone": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "fromInclusive": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "default": null
+        },
+        "toInclusive": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "operator"
+      ]
+    },
+    "arraySelector": {
+      "enum": [
+        "any",
+        "all",
+        "none",
+        "first",
+        "only"
+      ]
+    },
+    "onMissing": {
+      "enum": [
+        "fail",
+        "pass",
+        "skip"
+      ]
+    }
+  },
+  "required": [
+    "source",
+    "compare",
+    "arraySelector",
+    "onMissing"
+  ],
+  "$id": "https://ruleforge-docs.onrender.com/schemas/date-filter-config.schema.json",
+  "title": "Date filter config"
+}

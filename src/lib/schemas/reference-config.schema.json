@@ -1,0 +1,29 @@
+{
+  "type": [
+    "object",
+    "null"
+  ],
+  "properties": {
+    "referenceId": {
+      "type": "string"
+    },
+    "matchOn": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "default": null
+    }
+  },
+  "required": [
+    "referenceId"
+  ],
+  "$id": "https://ruleforge-docs.onrender.com/schemas/reference-config.schema.json",
+  "title": "Reference (multi-row lookup) config"
+}

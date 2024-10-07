@@ -1,0 +1,200 @@
+import type { NodeCategory, NodeData } from "@/lib/types";
+
+export type NodeKindMeta = {
+  category: NodeCategory;
+  label: string;
+  shortLabel: string;
+  badge: string;
+  color: string;
+  description: string;
+  defaultLabel: string;
+  defaultData: () => NodeData;
+};
+
+export const NODE_KINDS: Record<NodeCategory, NodeKindMeta> = {
+  input: {
+    category: "input",
+    label: "Start",
+    shortLabel: "Start",
+    badge: "START",
+    color: "#2e7d4f",
+    description: "Entry point — exactly one per rule. The request enters here.",
+    defaultLabel: "Start",
+    defaultData: () => ({ label: "Start", category: "input" }),
+  },
+  output: {
+    category: "output",
+    label: "End",
+    shortLabel: "End",
+    badge: "END",
+    color: "#5b3a72",
+    description: "Exit point — assembles the envelope's result.",
+    defaultLabel: "End",
+    defaultData: () => ({ label: "End", category: "output" }),
+  },
+  filter: {
+    category: "filter",
+    label: "Filter",
+    shortLabel: "Filter",
+    badge: "FLT",
+    color: "#1f4a6b",
+    description: "Predicate over a value. Routes via pass/fail/skip.",
+    defaultLabel: "Filter",
+    defaultData: () => ({
+      label: "Filter",
+      category: "filter",
+      templateId: "sys-filter-str",
+      config: {
+        source: { kind: "request", path: "" },
+        compare: { operator: "equals", value: "", caseInsensitive: true, trim: true },
+        arraySelector: "first",
+        onMissing: "fail",
+      },
+    }),
+  },
+  logic: {
+    category: "logic",
+    label: "Logic",
+    shortLabel: "Logic",
+    badge: "LOG",
+    color: "#5b3a72",
+    description: "Combine upstream verdicts: and/or/xor/not.",
+    defaultLabel: "AND",
+    defaultData: () => ({ label: "AND", category: "logic", templateId: "sys-and" }),
+  },
+  product: {
+    category: "product",
+    label: "Product",
+    shortLabel: "Product",
+    badge: "PRD",
+    color: "#1c5c3b",
+    description: "Emit a structured object (e.g. an ancillary).",
+    defaultLabel: "Product",
+    defaultData: () => ({
+      label: "Product",
+      category: "product",
+      config: { output: {} },
+    }),
+  },
+  mutator: {
+    category: "mutator",
+    label: "Mutator",
+    shortLabel: "Mutator",
+    badge: "MUT",
+    color: "#8a5a00",
+    description: "Override one field on the upstream object.",
+    defaultLabel: "Set field",
+    defaultData: () => ({
+      label: "Set field",
+      category: "mutator",
+      templateId: "sys-set",
+      config: { target: "", from: "" },
+    }),
+  },
+  calc: {
+    category: "calc",
+    label: "Calc",
+    shortLabel: "Calc",
+    badge: "CALC",
+    color: "#6b3a1f",
+    description: "Arithmetic / boolean expression via NCalc.",
+    defaultLabel: "Calc",
+    defaultData: () => ({ label: "Calc", category: "calc", config: { expression: "" } }),
+  },
+  constant: {
+    category: "constant",
+    label: "Constant",
+    shortLabel: "Constant",
+    badge: "CON",
+    color: "#3a3a3a",
+    description: "Emit a literal value.",
+    defaultLabel: "Constant",
+    defaultData: () => ({ label: "Constant", category: "constant", config: { value: {} } }),
+  },
+  ruleRef: {
+    category: "ruleRef",
+    label: "Sub-rule",
+    shortLabel: "Sub-rule",
+    badge: "REF",
+    color: "#444",
+    description: "Invoke another rule with mappings.",
+    defaultLabel: "Sub-rule",
+    defaultData: () => ({
+      label: "Sub-rule",
+      category: "ruleRef",
+      subRuleCall: {
+        ruleId: "",
+        inputMapping: {},
+        outputMapping: {},
+        onError: "fail",
+        pinnedVersion: "latest",
+      },
+    }),
+  },
+  iterator: {
+    category: "iterator",
+    label: "ForEach",
+    shortLabel: "ForEach",
+    badge: "ITR",
+    color: "#0f5b66",
+    description: "Iterate over an array; downstream sub-graph runs per element.",
+    defaultLabel: "For each",
+    defaultData: () => ({
+      label: "For each",
+      category: "iterator",
+      config: { source: "", as: "item" },
+    }),
+  },
+  merge: {
+    category: "merge",
+    label: "Merge",
+    shortLabel: "Merge",
+    badge: "MRG",
+    color: "#0f5b66",
+    description: "Close iteration scope and aggregate per-iteration outputs.",
+    defaultLabel: "Merge",
+    defaultData: () => ({ label: "Merge", category: "merge", config: { mode: "collect" } }),
+  },
+  reference: {
+    category: "reference",
+    label: "Reference",
+    shortLabel: "Reference",
+    badge: "REF",
+    color: "#3a3a3a",
+    description: "Reference set lookup (read-only, multi-row).",
+    defaultLabel: "Reference",
+    defaultData: () => ({ label: "Reference", category: "reference" }),
+  },
+  sql: {
+    category: "sql",
+    label: "SQL",
+    shortLabel: "SQL",
+    badge: "SQL",
+    color: "#3a3a3a",
+    description: "External SQL callout (reserved).",
+    defaultLabel: "SQL",
+    defaultData: () => ({ label: "SQL", category: "sql" }),
+  },
+  api: {
+    category: "api",
+    label: "API",
+    shortLabel: "API",
+    badge: "API",
+    color: "#3a3a3a",
+    description: "External HTTP callout (reserved).",
+    defaultLabel: "API",
+    defaultData: () => ({ label: "API", category: "api" }),
+  },
+};
+
+export const PALETTE_CATEGORIES: NodeCategory[] = [
+  "filter",
+  "logic",
+  "product",
+  "mutator",
+  "calc",
+  "constant",
+  "iterator",
+  "merge",
+  "ruleRef",
+];

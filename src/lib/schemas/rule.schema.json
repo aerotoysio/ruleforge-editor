@@ -1,0 +1,334 @@
+{
+  "type": [
+    "object",
+    "null"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "endpoint": {
+      "type": "string"
+    },
+    "method": {
+      "enum": [
+        "GET",
+        "POST"
+      ]
+    },
+    "status": {
+      "enum": [
+        "draft",
+        "review",
+        "published"
+      ]
+    },
+    "currentVersion": {
+      "type": "integer"
+    },
+    "inputSchema": true,
+    "outputSchema": true,
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "position": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "x",
+              "y"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "category": {
+                "enum": [
+                  "input",
+                  "output",
+                  "logic",
+                  "filter",
+                  "product",
+                  "sql",
+                  "api",
+                  "reference",
+                  "ruleRef",
+                  "calc",
+                  "constant",
+                  "mutator",
+                  "iterator",
+                  "merge"
+                ]
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "default": null
+              },
+              "templateId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "default": null
+              },
+              "config": {
+                "default": null
+              },
+              "connectionId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "default": null
+              },
+              "subRuleCall": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "ruleId": {
+                    "type": "string"
+                  },
+                  "inputMapping": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "outputMapping": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "onError": {
+                    "enum": [
+                      "skip",
+                      "fail",
+                      "default"
+                    ]
+                  },
+                  "defaultValue": true,
+                  "pinnedVersion": true,
+                  "forEach": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "default": null
+                  },
+                  "as": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "default": null
+                  }
+                },
+                "required": [
+                  "ruleId",
+                  "inputMapping",
+                  "outputMapping",
+                  "onError",
+                  "defaultValue",
+                  "pinnedVersion"
+                ],
+                "default": null
+              },
+              "readsContext": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "default": null
+              },
+              "writesContext": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "default": null
+              }
+            },
+            "required": [
+              "label",
+              "category"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "position",
+          "data"
+        ]
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "branch": {
+            "enum": [
+              "pass",
+              "fail",
+              "default",
+              null
+            ],
+            "default": null
+          },
+          "sourceHandle": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          },
+          "targetHandle": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          },
+          "label": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "id",
+          "source",
+          "target"
+        ]
+      }
+    },
+    "updatedAt": {
+      "type": "string"
+    },
+    "contextSchema": {
+      "default": null
+    },
+    "projectId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "description": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "tags": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "default": null
+    },
+    "category": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "updatedBy": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "endpoint",
+    "method",
+    "status",
+    "currentVersion",
+    "inputSchema",
+    "outputSchema",
+    "nodes",
+    "edges",
+    "updatedAt"
+  ],
+  "$id": "https://ruleforge-docs.onrender.com/schemas/rule.schema.json",
+  "title": "Rule (top-level)"
+}
