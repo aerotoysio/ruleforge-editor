@@ -1,11 +1,13 @@
 "use client";
 
-import { Trash2, Wand2, Hash, Quote, Database, BookOpen, Type } from "lucide-react";
+import { Trash2, Wand2, Quote, Database, BookOpen, Type, Filter, CalendarDays, Hash } from "lucide-react";
 import { useRuleStore } from "@/lib/store/rule-store";
 import { useNodesStore } from "@/lib/store/nodes-store";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/button";
 import { PathPicker } from "@/components/path-picker/PathPicker";
+import { ReferenceMultiSelect } from "@/components/bindings/ReferenceMultiSelect";
+import { DateBindingPicker } from "@/components/bindings/DateBindingPicker";
 import { DesignerHeader } from "./DesignerHeader";
 import type { NodeDef, NodePort, PortBinding } from "@/lib/types";
 
@@ -167,18 +169,44 @@ type PortBindingRowProps = {
 };
 
 function PortBindingRow({ port, binding, onChange, inputSchema, paramOnly }: PortBindingRowProps) {
-  const kinds: PortBinding["kind"][] = paramOnly
+  // ref-select is only useful when the port wants a list of values.
+  const allowsRefSelect = port.type === "string-array" || port.type === "number-array";
+  // Date picker is offered for date-typed ports.
+  const allowsDate = port.type === "date";
+  // count-of resolves to a number from an array path.
+  const allowsCountOf = port.type === "number" || port.type === "integer";
+
+  const baseKinds: PortBinding["kind"][] = paramOnly
     ? ["literal", "reference"]
     : ["path", "context", "literal", "reference"];
+  const extras: PortBinding["kind"][] = [
+    ...(allowsRefSelect ? ["ref-select" as const] : []),
+    ...(allowsDate ? ["date" as const] : []),
+    ...(allowsCountOf && !paramOnly ? ["count-of" as const] : []),
+  ];
+  const kinds: PortBinding["kind"][] = [...baseKinds.slice(0, -1), ...extras, baseKinds[baseKinds.length - 1]];
 
-  const currentKind = binding?.kind ?? (paramOnly ? "literal" : "path");
+  const currentKind = binding?.kind ?? (allowsDate ? "date" : kinds[0]);
 
   function changeKind(kind: PortBinding["kind"]) {
     if (kind === "path") onChange({ kind: "path", path: "" });
     else if (kind === "context") onChange({ kind: "context", key: "" });
     else if (kind === "literal") onChange({ kind: "literal", value: "" });
     else if (kind === "reference") onChange({ kind: "reference", referenceId: "" });
+    else if (kind === "ref-select") onChange({ kind: "ref-select", referenceId: "", valueColumn: "" });
+    else if (kind === "date") onChange({ kind: "date", mode: "absolute", date: new Date().toISOString().slice(0, 10) });
+    else if (kind === "count-of") onChange({ kind: "count-of", arrayPath: "" });
   }
+
+  const KIND_LABEL: Record<PortBinding["kind"], string> = {
+    path: "path",
+    context: "context",
+    literal: "literal",
+    reference: "ref",
+    "ref-select": "from ref",
+    date: "date",
+    "count-of": "count",
+  };
 
   return (
     <div className="rounded-md border bg-card p-2.5 flex flex-col gap-2">
@@ -215,7 +243,10 @@ function PortBindingRow({ port, binding, onChange, inputSchema, paramOnly }: Por
               {k === "context" ? <Quote className="w-2.5 h-2.5" /> : null}
               {k === "literal" ? <Type className="w-2.5 h-2.5" /> : null}
               {k === "reference" ? <Database className="w-2.5 h-2.5" /> : null}
-              {k}
+              {k === "ref-select" ? <Filter className="w-2.5 h-2.5" /> : null}
+              {k === "date" ? <CalendarDays className="w-2.5 h-2.5" /> : null}
+              {k === "count-of" ? <Hash className="w-2.5 h-2.5" /> : null}
+              {KIND_LABEL[k]}
             </span>
           </button>
         ))}
@@ -339,6 +370,36 @@ function PortBindingValue({
         value={binding.referenceId}
         onChange={(referenceId) => onChange({ kind: "reference", referenceId })}
       />
+    );
+  }
+  if (binding.kind === "ref-select") {
+    return (
+      <ReferenceMultiSelect
+        value={binding}
+        onChange={(next) => onChange(next)}
+      />
+    );
+  }
+  if (binding.kind === "date") {
+    return <DateBindingPicker value={binding} onChange={(next) => onChange(next)} />;
+  }
+  if (binding.kind === "count-of") {
+    return (
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[10.5px] uppercase tracking-wider text-muted-foreground/80 font-medium">
+          Count of items at
+        </span>
+        <PathPicker
+          schema={inputSchema}
+          value={binding.arrayPath}
+          onChange={(arrayPath) => onChange({ kind: "count-of", arrayPath })}
+          placeholder="$.passengers[*]"
+        />
+        <span className="text-[10.5px] text-muted-foreground italic">
+          Resolves to the number of items at this path. Useful for &ldquo;if there are 2+
+          adults&rdquo; type rules.
+        </span>
+      </div>
     );
   }
   return null;
