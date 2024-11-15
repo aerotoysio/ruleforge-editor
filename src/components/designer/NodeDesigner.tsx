@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { PathPicker } from "@/components/path-picker/PathPicker";
 import { ReferenceMultiSelect } from "@/components/bindings/ReferenceMultiSelect";
 import { DateBindingPicker } from "@/components/bindings/DateBindingPicker";
+import { ObjectShapeEditor } from "@/components/bindings/ObjectShapeEditor";
 import { DesignerHeader } from "./DesignerHeader";
 import type { NodeDef, NodePort, PortBinding } from "@/lib/types";
 
@@ -305,18 +306,10 @@ function PortBindingValue({
     const isObjectish = port.type === "object" || port.type === "any";
     if (isObjectish) {
       return (
-        <textarea
-          rows={4}
-          className="w-full text-[12px] font-mono px-2 py-1.5 rounded border border-border bg-background focus:outline-none focus:ring-2 focus:ring-foreground/30"
-          value={typeof binding.value === "string" ? binding.value : JSON.stringify(binding.value, null, 2)}
-          onChange={(e) => {
-            try {
-              onChange({ kind: "literal", value: JSON.parse(e.target.value) });
-            } catch {
-              onChange({ kind: "literal", value: e.target.value });
-            }
-          }}
-          placeholder={`{ "key": "value" }`}
+        <ObjectShapeEditor
+          value={binding.value}
+          onChange={(next) => onChange({ kind: "literal", value: next })}
+          inputSchema={inputSchema}
         />
       );
     }

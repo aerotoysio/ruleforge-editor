@@ -77,16 +77,27 @@ function CanvasInner() {
       (rule?.edges ?? []).map((e) => {
         const traversed = trace?.traversedEdges.has(e.id) ?? false;
         const dim = trace !== null && !traversed;
+        const branch = e.branch ?? "default";
+        const colour = branch === "pass" ? "var(--color-pass)" : branch === "fail" ? "var(--color-fail)" : "var(--color-default)";
         return {
           id: e.id,
           source: e.source,
           target: e.target,
-          label: e.branch && e.branch !== "default" ? e.branch : undefined,
-          labelStyle: { fontSize: 10, fontFamily: "var(--font-mono)" },
-          labelBgStyle: { fill: "var(--background)" },
-          style: { ...edgeStyle(e.branch, traversed), opacity: dim ? 0.25 : 1 },
-          markerEnd: { type: MarkerType.ArrowClosed, color: edgeStyle(e.branch, traversed).stroke as string },
-          data: { branch: e.branch ?? "default" },
+          // Show a pill label only for pass/fail (default edges stay clean).
+          label: branch !== "default" ? branch.toUpperCase() : undefined,
+          labelStyle: {
+            fontSize: 9.5,
+            fontFamily: "var(--font-mono)",
+            fontWeight: 700,
+            letterSpacing: "0.06em",
+            fill: "#fff",
+          },
+          labelBgStyle: { fill: colour },
+          labelBgPadding: [6, 4] as [number, number],
+          labelBgBorderRadius: 999,
+          style: { ...edgeStyle(branch, traversed), opacity: dim ? 0.25 : 1 },
+          markerEnd: { type: MarkerType.ArrowClosed, color: colour },
+          data: { branch },
           selected: selection.kind === "edge" && selection.id === e.id,
         };
       }),
@@ -156,6 +167,8 @@ function CanvasInner() {
     e.dataTransfer.dropEffect = "copy";
   }, []);
 
+  const setBinding = useRuleStore((s) => s.setBinding);
+
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
@@ -169,18 +182,31 @@ function CanvasInner() {
       } catch {
         return;
       }
-      if (payload.kind !== "node") return;
-      const def = nodeDefs.find((n) => n.id === payload.nodeId);
-      if (!def) return;
       const position = rfInstance.screenToFlowPosition({ x: e.clientX, y: e.clientY });
       const previousSelection = useRuleStore.getState().selection;
-      const newId = addInstance(payload.nodeId, position);
+
+      let newId = "";
+      if (payload.kind === "node") {
+        const def = nodeDefs.find((n) => n.id === payload.nodeId);
+        if (!def) return;
+        newId = addInstance(payload.nodeId, position);
+      } else if (payload.kind === "reference") {
+        // Drop a reference: create a pre-wired lookup-node instance with
+        // referenceId already bound. User just fills in target / valueColumn / matchOn.
+        const lookupDef = nodeDefs.find((n) => n.id === "node-mutator-lookup");
+        if (!lookupDef) return;
+        newId = addInstance("node-mutator-lookup", position);
+        if (newId) {
+          setBinding(newId, "referenceId", { kind: "reference", referenceId: payload.referenceId });
+        }
+      }
+
       if (newId && previousSelection.kind === "node" && previousSelection.id !== newId) {
         addEdge(previousSelection.id, newId, "default");
       }
       if (newId) select({ kind: "node", id: newId });
     },
-    [rfInstance, addInstance, addEdge, select, nodeDefs],
+    [rfInstance, addInstance, addEdge, select, nodeDefs, setBinding],
   );
 
   return (
