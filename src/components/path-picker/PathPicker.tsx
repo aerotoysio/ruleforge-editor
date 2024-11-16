@@ -23,52 +23,71 @@ export function PathPicker({ schema, value, onChange, hint, placeholder = "$.fie
     return scoreSuggestions(tree, hint).slice(0, 5);
   }, [tree, hint]);
 
+  // Show top 2 inline (without clicking Pick) — when there's a hint and the
+  // current value is empty or doesn't match a suggestion, surface them.
+  const inlineSuggestions = suggestions.slice(0, 2);
+  const showInline = inlineSuggestions.length > 0 && (!value || !inlineSuggestions.some((s) => s.path === value));
+
   return (
-    <div className="flex flex-col gap-1 w-full">
+    <div className="flex flex-col gap-1.5 w-full">
       <div className="flex gap-1.5">
         <Input
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="mono"
+          className="font-mono"
         />
         <button
           onClick={() => setOpen(!open)}
           disabled={!schema}
-          className="h-8 px-2 rounded inline-flex items-center gap-1 text-[12px]"
-          style={{
-            background: open ? "var(--color-accent)" : "var(--color-bg)",
-            color: open ? "var(--color-accent-fg)" : "var(--color-fg-soft)",
-            border: "1px solid var(--color-border-strong)",
-          }}
+          className={
+            "h-8 px-2 rounded-md inline-flex items-center gap-1 text-[12px] border transition-colors " +
+            (open
+              ? "bg-foreground text-background border-foreground"
+              : "bg-card text-foreground border-border hover:border-foreground/30")
+          }
           title={schema ? "Pick from schema" : "No schema available"}
         >
           <Crosshair className="w-3.5 h-3.5" />
           Pick
         </button>
       </div>
+
+      {showInline ? (
+        <div className="flex items-center gap-1 flex-wrap">
+          <Wand2 className="w-2.5 h-2.5 text-muted-foreground/70" />
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground/80 font-medium mr-1">Suggested:</span>
+          {inlineSuggestions.map((s) => (
+            <button
+              key={s.path}
+              onClick={() => onChange(s.path)}
+              className="font-mono text-[10.5px] px-1.5 h-5 rounded bg-muted/60 text-foreground hover:bg-muted transition-colors max-w-[60%] truncate"
+              title={`${s.path} · ${s.type}`}
+            >
+              {s.path}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {open && schema && tree ? (
-        <div
-          className="rounded p-2 max-h-72 overflow-auto"
-          style={{ background: "var(--color-bg-soft)", border: "1px solid var(--color-border)" }}
-        >
+        <div className="rounded-md p-2 max-h-72 overflow-auto bg-muted/30 border">
           {suggestions.length > 0 ? (
             <div className="mb-2 flex flex-col gap-1">
-              <div className="text-[10px] uppercase tracking-wider flex items-center gap-1.5" style={{ color: "var(--color-fg-dim)" }}>
-                <Wand2 className="w-3 h-3" /> Suggested by template
+              <div className="text-[10px] uppercase tracking-wider flex items-center gap-1.5 text-muted-foreground/80 font-medium">
+                <Wand2 className="w-3 h-3" /> Best matches
               </div>
               {suggestions.map((s) => (
                 <button
                   key={s.path}
                   onClick={() => { onChange(s.path); setOpen(false); }}
-                  className="text-left mono text-[11.5px] px-2 py-1 rounded hover:underline truncate"
-                  style={{ background: "var(--color-bg)", border: "1px solid var(--color-border)" }}
+                  className="text-left font-mono text-[11.5px] px-2 py-1 rounded bg-card border border-border hover:border-foreground/30 transition-colors truncate"
                   title={s.path}
                 >
-                  {s.path} <span style={{ color: "var(--color-fg-dim)" }}>· {s.type}</span>
+                  {s.path} <span className="text-muted-foreground">· {s.type}</span>
                 </button>
               ))}
-              <hr className="my-1.5 border-t" style={{ borderColor: "var(--color-border)" }} />
+              <hr className="my-1.5 border-t border-border" />
             </div>
           ) : null}
           <PathTreeNode node={tree} onPick={(p) => { onChange(p); setOpen(false); }} />
