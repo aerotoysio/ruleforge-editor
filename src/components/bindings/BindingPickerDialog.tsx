@@ -549,13 +549,37 @@ function deriveTab(initial: PortBinding | undefined, port: NodePort): Tab {
   if (initial?.kind === "literal") return "literal";
   if (initial?.kind === "ref-select" || initial?.kind === "reference") return "ref";
   if (initial?.kind === "date") return "date";
-  // No binding yet — pick the most natural default based on port type.
+
+  // No binding yet — pick the most natural default given (a) the port's
+  // explicit bindingKinds restriction, then (b) the port type.
+  if (port.bindingKinds && port.bindingKinds.length > 0) {
+    const first = port.bindingKinds[0];
+    if (first === "path") return "request";
+    if (first === "context") return "context";
+    if (first === "literal") return "literal";
+    if (first === "ref-select" || first === "reference") return "ref";
+    if (first === "date") return "date";
+  }
   if (port.type === "date") return "date";
   if (port.type === "string-array" || port.type === "number-array") return "ref";
   return "request";
 }
 
 function isTabAllowed(tab: Tab, port: NodePort): boolean {
+  // If the port has an explicit allow-list of binding kinds, honour it
+  // verbatim — e.g. a "match" port on a date filter only allows kind="date"
+  // so the user sees just the calendar picker, no Request/Literal tabs.
+  if (port.bindingKinds && port.bindingKinds.length > 0) {
+    const tabKind: PortBinding["kind"] | "ref" = tab === "request" ? "path"
+      : tab === "context" ? "context"
+      : tab === "literal" ? "literal"
+      : tab === "ref" ? "ref-select"
+      : tab === "date" ? "date"
+      : "literal";
+    return port.bindingKinds.includes(tabKind as PortBinding["kind"]);
+  }
+
+  // Otherwise fall back to type-based defaults.
   if (tab === "ref") return port.type === "string-array" || port.type === "number-array" || port.type === "string" || port.type === "any";
   if (tab === "date") return port.type === "date";
   return true;
