@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { ArrowDownToLine, Box, Type as TypeIcon, Database, X, Check } from "lucide-react";
+import { ArrowDownToLine, Box, Type as TypeIcon, Database, Check } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/Input";
@@ -61,19 +61,14 @@ export function BindingPickerDialog({ open, onClose, port, inputSchema, initial,
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
       <DialogContent className="max-w-[900px] sm:max-w-[900px] p-0 gap-0 flex flex-col h-[640px]">
-        {/* Header */}
-        <header className="px-5 py-3 border-b shrink-0 flex items-start gap-3 bg-card">
-          <div className="flex flex-col leading-tight min-w-0 flex-1">
-            <DialogTitle className="text-[15px] font-semibold tracking-tight text-foreground">
-              Bind&nbsp;<span className="font-mono">{port.name}</span>
-            </DialogTitle>
-            <DialogDescription className="text-[12px] text-muted-foreground mt-0.5 max-w-prose">
-              {port.description ?? `Choose where this ${port.type} value comes from.`}
-            </DialogDescription>
-          </div>
-          <button onClick={onClose} className="w-8 h-8 inline-flex items-center justify-center rounded text-muted-foreground hover:bg-muted">
-            <X className="w-3.5 h-3.5" />
-          </button>
+        {/* Header — DialogContent primitive renders its own close button at top-right; pr-12 leaves room for it */}
+        <header className="px-5 pr-12 py-3 border-b shrink-0 flex flex-col bg-card">
+          <DialogTitle className="text-[15px] font-semibold tracking-tight text-foreground">
+            Bind&nbsp;<span className="font-mono">{port.name}</span>
+          </DialogTitle>
+          <DialogDescription className="text-[12px] text-muted-foreground mt-0.5 max-w-prose">
+            {port.description ?? `Choose where this ${port.type} value comes from.`}
+          </DialogDescription>
         </header>
 
         {/* Tab strip */}
@@ -179,7 +174,7 @@ function SchemaTreePanel({
     };
     visit(tree);
     // Apply filter if active
-    if (f) return flat.filter((n) => n.path.toLowerCase().includes(f) || (n.key?.toLowerCase().includes(f) ?? false));
+    if (f) return flat.filter((n) => n.path.toLowerCase().includes(f) || n.label.toLowerCase().includes(f));
     return flat;
   }, [tree, port.type, f]);
 
@@ -305,7 +300,7 @@ function SchemaTreeNode({
   filter: string;
 }) {
   const compatible = isCompatible(node, portType);
-  const matchesFilter = !filter || node.path.toLowerCase().includes(filter) || node.key?.toLowerCase().includes(filter);
+  const matchesFilter = !filter || node.path.toLowerCase().includes(filter) || node.label.toLowerCase().includes(filter);
 
   // If a filter is active, hide branches with no descendants matching.
   if (filter) {
@@ -315,26 +310,31 @@ function SchemaTreeNode({
 
   const hasChildren = (node.children?.length ?? 0) > 0;
   const isSelected = node.path === selectedPath;
+  // Root node ("$") is non-pickable as a value — show it as a header.
+  const isRoot = node.depth === 0;
 
   return (
     <div className="flex flex-col">
       <button
         type="button"
-        onClick={() => compatible && onPick(node.path)}
-        disabled={!compatible}
+        onClick={() => compatible && !isRoot && onPick(node.path)}
+        disabled={!compatible || isRoot}
         className={cn(
-          "text-left flex items-center gap-1.5 px-2 py-1 rounded-md text-[12px] transition-colors",
+          "text-left flex items-center gap-2 px-2 py-1 rounded-md text-[12px] transition-colors",
           isSelected ? "bg-foreground text-background"
+          : isRoot ? "text-muted-foreground/70 cursor-default font-semibold uppercase tracking-wide text-[10px]"
           : compatible ? "hover:bg-muted/60 text-foreground"
           : "text-muted-foreground/50 cursor-not-allowed",
         )}
         style={{ paddingLeft: 8 + node.depth * 14 }}
-        title={!compatible ? `${node.type} doesn't fit this ${portType} port` : node.path}
+        title={!compatible ? `${prettyType(node.type)} doesn't fit a ${portType} port` : node.path}
       >
-        <span className="font-mono text-[11.5px] truncate">{node.key ?? "$"}</span>
-        <span className={cn("text-[10px] tabular-nums ml-auto pl-2", isSelected ? "opacity-80" : "text-muted-foreground/70")}>
-          {prettyType(node.type)}
-        </span>
+        <span className={cn("font-mono truncate", isRoot ? "" : "text-[11.5px]")}>{isRoot ? "request" : node.label}</span>
+        {!isRoot ? (
+          <span className={cn("text-[10px] tabular-nums ml-auto pl-2", isSelected ? "opacity-80" : "text-muted-foreground/70")}>
+            {prettyType(formatSpecificType(node))}
+          </span>
+        ) : null}
       </button>
       {hasChildren ? (
         <div className="flex flex-col">
@@ -645,21 +645,43 @@ function describePortBinding(b: PortBinding | undefined): string {
 
 function isCompatible(node: SchemaPathNode, portType: NodePort["type"]): boolean {
   const t = node.type;
+  const fmt = node.schema?.format; // JSON Schema "format" — e.g. "date", "date-time", "email"
+  const isDateFormat = fmt === "date" || fmt === "date-time" || fmt === "time";
+
   if (portType === "any") return true;
   // Iterators / per-element binders want arrays specifically — NOT objects.
-  if (portType === "object-array") return t === "array" || t === "any";
-  if (portType === "object") return t === "object" || t === "any";
-  if (portType === "string-array" || portType === "number-array") return t === "array" || t === "any";
-  if (portType === "string") return t === "string" || t === "any";
-  if (portType === "number" || portType === "integer") return t === "number" || t === "integer" || t === "any";
-  if (portType === "date") return t === "string" || t === "any"; // dates are strings in JSON Schema
-  if (portType === "boolean") return t === "boolean" || t === "any";
+  if (portType === "object-array") return t === "array";
+  if (portType === "object") return t === "object";
+  if (portType === "string-array" || portType === "number-array") return t === "array";
+  // String port: only plain strings — date-formatted strings are excluded so
+  // they don't pollute "all compatible" suggestions for a string filter.
+  if (portType === "string") return t === "string" && !isDateFormat;
+  if (portType === "number" || portType === "integer") return t === "number" || t === "integer";
+  // Date port: strings with a date-ish format. We're lenient when no format
+  // is set (some schemas don't bother), since the alternative is filtering
+  // those out and confusing the user.
+  if (portType === "date") return t === "string" && (isDateFormat || !fmt);
+  if (portType === "boolean") return t === "boolean";
   return true;
+}
+
+/**
+ * For tree-node display: replace "string" with a more specific label when
+ * the JSON Schema format tells us this is a date / email / uuid etc.
+ */
+function formatSpecificType(node: SchemaPathNode): string {
+  const fmt = node.schema?.format;
+  if (node.type === "string" && (fmt === "date" || fmt === "date-time")) return "date";
+  if (node.type === "string" && fmt === "email") return "email";
+  if (node.type === "string" && fmt === "uuid") return "uuid";
+  return node.type;
 }
 
 function hasMatchingChild(node: SchemaPathNode, filter: string): boolean {
   if (!node.children) return false;
-  return node.children.some((c) => c.path.toLowerCase().includes(filter) || c.key?.toLowerCase().includes(filter) || hasMatchingChild(c, filter));
+  return node.children.some(
+    (c) => c.path.toLowerCase().includes(filter) || c.label.toLowerCase().includes(filter) || hasMatchingChild(c, filter),
+  );
 }
 
 function prettyType(t: string): string {
