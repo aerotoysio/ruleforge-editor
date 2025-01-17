@@ -18,9 +18,12 @@ import { NodeConfigDialog } from "@/components/bindings/NodeConfigDialog";
 import { cn } from "@/lib/utils";
 
 // Categories that get the new unified single-popup config experience.
-// Other categories keep the per-port side sheet for now — we'll expand
-// as we validate the pattern.
-const UNIFIED_DIALOG_CATEGORIES = new Set(["filter"]);
+// Terminal nodes (input/output) don't open a dialog — they have nothing to
+// configure beyond the inline label-edit on canvas. Everything else uses the
+// dialog so the side sheet's job becomes purely metadata browsing.
+const UNIFIED_DIALOG_CATEGORIES = new Set([
+  "filter", "mutator", "calc", "iterator", "merge", "constant", "ruleRef",
+]);
 
 type Tab = "graph" | "schema" | "tests";
 
@@ -70,9 +73,13 @@ export function RuleEditorClient({ initial }: { initial: Rule }) {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [dirty]);
 
+  // Side sheet now only opens for the "Rule" toolbar button (rule metadata)
+  // and for edge selection (no popup yet for edges). Node selection routes
+  // entirely through the dialog. Terminal nodes (input/output) get no UI —
+  // they're configured via the inline label-edit on canvas.
   const sheetMode: "selection" | "rule" | null =
     ruleSheetOpen ? "rule"
-    : (tab === "graph" && selection.kind !== "none" && !useUnifiedDialog) ? "selection"
+    : (tab === "graph" && selection.kind === "edge") ? "selection"
     : null;
 
   function runTest(t: RuleTest) {
