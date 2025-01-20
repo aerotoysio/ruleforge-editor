@@ -8,6 +8,43 @@ import { Select } from "@/components/ui/Select";
 
 const TYPES: JsonSchemaType[] = ["string", "number", "integer", "boolean", "object", "array", "null"];
 
+/**
+ * The user-facing type picker. We expand the JSON Schema type set with a few
+ * common "string with format" pseudo-types — date / date-time / email — so
+ * authors don't have to know that a date is "string + format=date" under the
+ * hood. The schema written to disk is still a real JSON Schema fragment.
+ */
+type PickType = JsonSchemaType | "date" | "date-time" | "email";
+
+const PICK_TYPES: { value: PickType; label: string }[] = [
+  { value: "string",     label: "text"     },
+  { value: "number",     label: "number"   },
+  { value: "integer",    label: "integer"  },
+  { value: "boolean",    label: "yes / no" },
+  { value: "date",       label: "date"     },
+  { value: "date-time",  label: "date-time"},
+  { value: "email",      label: "email"    },
+  { value: "object",     label: "object"   },
+  { value: "array",      label: "list"     },
+];
+
+function schemaForPickType(t: PickType): JsonSchema {
+  if (t === "date" || t === "date-time" || t === "email") {
+    return { type: "string", format: t };
+  }
+  if (t === "object") return { type: "object", properties: {} };
+  if (t === "array") return { type: "array", items: { type: "string" } };
+  return { type: t };
+}
+
+function detectPickType(schema: JsonSchema): PickType {
+  const t = pickType(schema);
+  if (t === "string" && schema.format === "date") return "date";
+  if (t === "string" && schema.format === "date-time") return "date-time";
+  if (t === "string" && schema.format === "email") return "email";
+  return (t ?? "string") as PickType;
+}
+
 type Props = {
   name: string;
   schema: JsonSchema;
@@ -22,6 +59,7 @@ type Props = {
 export function FieldRow({ name, schema, required, depth, onRename, onChange, onDelete, onToggleRequired }: Props) {
   const [open, setOpen] = useState(false);
   const type = pickType(schema);
+  const userType = detectPickType(schema);
   const hasNested = type === "object" || type === "array";
 
   return (
@@ -48,11 +86,11 @@ export function FieldRow({ name, schema, required, depth, onRename, onChange, on
           className="mono"
         />
         <Select
-          value={type ?? "string"}
-          onChange={(e) => onChange(retypeSchema(schema, e.target.value as JsonSchemaType))}
+          value={userType}
+          onChange={(e) => onChange(retypePickSchema(schema, e.target.value as PickType))}
         >
-          {TYPES.map((t) => (
-            <option key={t} value={t}>{t}</option>
+          {PICK_TYPES.map((t) => (
+            <option key={t.value} value={t.value}>{t.label}</option>
           ))}
         </Select>
         <label className="text-[11px] flex items-center gap-1.5 select-none cursor-pointer" title="Toggle required">
@@ -199,10 +237,10 @@ function NestedObject({ schema, depth, onChange }: { schema: JsonSchema; depth: 
       <AddField
         depth={depth}
         existingKeys={Object.keys(properties)}
-        onAdd={(name, t) =>
+        onAdd={(name, fieldSchema) =>
           onChange({
             ...schema,
-            properties: { ...properties, [name]: { type: t } },
+            properties: { ...properties, [name]: fieldSchema },
           })
         }
       />
@@ -229,9 +267,9 @@ function NestedArray({ schema, depth, onChange }: { schema: JsonSchema; depth: n
   );
 }
 
-export function AddField({ existingKeys, depth, onAdd }: { existingKeys: string[]; depth: number; onAdd: (name: string, type: JsonSchemaType) => void }) {
+export function AddField({ existingKeys, depth, onAdd }: { existingKeys: string[]; depth: number; onAdd: (name: string, schema: JsonSchema) => void }) {
   const [name, setName] = useState("");
-  const [type, setType] = useState<JsonSchemaType>("string");
+  const [type, setType] = useState<PickType>("string");
   const taken = existingKeys.includes(name);
   const disabled = !name.trim() || taken;
   return (
@@ -242,18 +280,18 @@ export function AddField({ existingKeys, depth, onAdd }: { existingKeys: string[
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter" && !disabled) {
-            onAdd(name.trim(), type);
+            onAdd(name.trim(), schemaForPickType(type));
             setName("");
           }
         }}
         placeholder="add field…"
         invalid={taken}
       />
-      <Select value={type} onChange={(e) => setType(e.target.value as JsonSchemaType)}>
-        {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+      <Select value={type} onChange={(e) => setType(e.target.value as PickType)}>
+        {PICK_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
       </Select>
       <button
-        onClick={() => { if (!disabled) { onAdd(name.trim(), type); setName(""); } }}
+        onClick={() => { if (!disabled) { onAdd(name.trim(), schemaForPickType(type)); setName(""); } }}
         disabled={disabled}
         className="w-7 h-7 flex items-center justify-center rounded disabled:opacity-30"
         style={{ color: "var(--color-fg)", border: "1px solid var(--color-border-strong)" }}
@@ -271,6 +309,14 @@ function pickType(schema: JsonSchema): JsonSchemaType | undefined {
 
 function retypeSchema(prev: JsonSchema, t: JsonSchemaType): JsonSchema {
   const next: JsonSchema = { type: t };
+  if (prev.description) next.description = prev.description;
+  if (t === "object") next.properties = prev.properties ?? {};
+  if (t === "array") next.items = prev.items ?? { type: "string" };
+  return next;
+}
+
+function retypePickSchema(prev: JsonSchema, t: PickType): JsonSchema {
+  const next = schemaForPickType(t);
   if (prev.description) next.description = prev.description;
   if (t === "object") next.properties = prev.properties ?? {};
   if (t === "array") next.items = prev.items ?? { type: "string" };
