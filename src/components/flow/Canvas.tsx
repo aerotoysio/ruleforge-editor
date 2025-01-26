@@ -257,6 +257,21 @@ function CanvasInner() {
           style={{ background: "var(--background)" }}
         />
       </ReactFlow>
+
+      {/* Onboarding hint — fade in when canvas is just Input → Output */}
+      {rule && rule.instances.length <= 2 ? (
+        <div
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+          aria-hidden
+        >
+          <div className="rounded-lg bg-background/80 backdrop-blur border border-dashed border-border px-5 py-4 max-w-sm text-center shadow-sm">
+            <div className="text-[13px] font-medium text-foreground">Drag a node from the right →</div>
+            <div className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+              Filters, references, calculations — drop them between Input and Output, then click each one to configure.
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
