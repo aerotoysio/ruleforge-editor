@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { ArrowLeft, Save, Play, Settings2, Sparkles } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ArrowLeft, Save, Play, Settings2, Sparkles, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { useRuleStore } from "@/lib/store/rule-store";
+import { useNodesStore } from "@/lib/store/nodes-store";
+import { validateRule, groupIssues, type ValidationIssue } from "@/lib/rule/validate";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { cn } from "@/lib/utils";
@@ -17,9 +19,18 @@ type Props = {
 
 export function Toolbar({ onTest, onOpenRuleSettings, onOpenAiDraft }: Props = {}) {
   const rule = useRuleStore((s) => s.rule);
+  const select = useRuleStore((s) => s.select);
   const dirty = useRuleStore((s) => s.dirty);
   const markClean = useRuleStore((s) => s.markClean);
+  const nodeDefs = useNodesStore((s) => s.nodes);
   const [busy, setBusy] = useState(false);
+  const [issuesOpen, setIssuesOpen] = useState(false);
+
+  const issues = useMemo(
+    () => (rule && nodeDefs.length > 0 ? validateRule(rule, nodeDefs) : []),
+    [rule, nodeDefs],
+  );
+  const { errors, warnings } = useMemo(() => groupIssues(issues), [issues]);
 
   if (!rule) return null;
 
@@ -70,6 +81,20 @@ export function Toolbar({ onTest, onOpenRuleSettings, onOpenAiDraft }: Props = {
           <Play className="w-3.5 h-3.5" /> Test
         </Button>
 
+        {/* Rule-validity indicator. Click to open the issues popover. */}
+        <ValidityBadge
+          issues={issues}
+          errors={errors}
+          warnings={warnings}
+          open={issuesOpen}
+          setOpen={setIssuesOpen}
+          onJump={(target) => {
+            if (target.kind === "instance") select({ kind: "node", id: target.instanceId });
+            if (target.kind === "edge") select({ kind: "edge", id: target.edgeId });
+            setIssuesOpen(false);
+          }}
+        />
+
         <div className="h-5 w-px bg-border shrink-0 mx-1" />
 
         <span
@@ -90,5 +115,88 @@ export function Toolbar({ onTest, onOpenRuleSettings, onOpenAiDraft }: Props = {
         </Button>
       </div>
     </header>
+  );
+}
+
+function ValidityBadge({
+  issues,
+  errors,
+  warnings,
+  open,
+  setOpen,
+  onJump,
+}: {
+  issues: ValidationIssue[];
+  errors: ValidationIssue[];
+  warnings: ValidationIssue[];
+  open: boolean;
+  setOpen: (b: boolean) => void;
+  onJump: (target: ValidationIssue["target"]) => void;
+}) {
+  if (issues.length === 0) {
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 px-2 h-6 rounded-full text-[10.5px] font-medium border bg-emerald-50 text-emerald-900 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-200 dark:border-emerald-900"
+        title="Rule looks good — no validation issues."
+      >
+        <CheckCircle2 className="w-3 h-3" />
+        Valid
+      </span>
+    );
+  }
+  const tone = errors.length > 0
+    ? "bg-red-50 text-red-900 border-red-200 dark:bg-red-950/30 dark:text-red-200 dark:border-red-900"
+    : "bg-amber-50 text-amber-900 border-amber-200 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-900";
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={cn(
+          "inline-flex items-center gap-1.5 px-2 h-6 rounded-full text-[10.5px] font-medium border transition-colors hover:opacity-90",
+          tone,
+        )}
+        title="Click to see validation issues"
+      >
+        <AlertTriangle className="w-3 h-3" />
+        {errors.length > 0 ? `${errors.length} ${errors.length === 1 ? "error" : "errors"}` : null}
+        {errors.length > 0 && warnings.length > 0 ? " · " : null}
+        {warnings.length > 0 ? `${warnings.length} ${warnings.length === 1 ? "warning" : "warnings"}` : null}
+      </button>
+
+      {open ? (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1.5 z-20 w-[420px] max-h-[400px] overflow-auto rounded-lg border bg-popover shadow-lg">
+            <div className="px-3 py-2 border-b bg-muted/30 text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/80">
+              Issues
+            </div>
+            <div className="divide-y">
+              {[...errors, ...warnings].map((issue, i) => (
+                <button
+                  key={i}
+                  onClick={() => onJump(issue.target)}
+                  className="w-full text-left px-3 py-2 flex items-start gap-2 hover:bg-muted/40 transition-colors"
+                >
+                  <div className={cn(
+                    "w-4 h-4 rounded-full inline-flex items-center justify-center shrink-0 mt-0.5",
+                    issue.severity === "error" ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300" : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+                  )}>
+                    <AlertTriangle className="w-2.5 h-2.5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[12px] text-foreground leading-snug">{issue.message}</div>
+                    <div className="text-[10px] text-muted-foreground/80 font-mono mt-0.5">
+                      {issue.kind} · {issue.target.kind === "instance" ? issue.target.instanceId : issue.target.kind === "edge" ? issue.target.edgeId : "rule"}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      ) : null}
+    </div>
   );
 }
