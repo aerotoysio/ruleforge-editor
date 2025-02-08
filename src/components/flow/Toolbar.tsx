@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Save, Play, Settings2, Sparkles, AlertTriangle, CheckCircle2, LayoutGrid, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { useRuleStore } from "@/lib/store/rule-store";
@@ -80,9 +80,22 @@ export function Toolbar({ onTest, onOpenRuleSettings, onOpenAiDraft }: Props = {
   );
   const { errors, warnings } = useMemo(() => groupIssues(issues), [issues]);
 
+  // Stable refs so the keyboard handler (registered once) sees the latest values.
+  const saveRef = useRef<() => Promise<void>>(() => Promise.resolve());
+  const dirtyRef = useRef(dirty);
+  const busyRef = useRef(busy);
+  useEffect(() => { dirtyRef.current = dirty; busyRef.current = busy; });
+
   if (!rule) return null;
 
-  async function save() {
+  async function save(opts: { force?: boolean } = {}) {
+    if (errors.length > 0 && !opts.force) {
+      const ok = confirm(
+        `This rule has ${errors.length} validation error${errors.length === 1 ? "" : "s"}. ` +
+        `Save anyway? It'll be saved as draft — fix errors before publishing.`,
+      );
+      if (!ok) return;
+    }
     setBusy(true);
     try {
       const res = await fetch(`/api/rules/${encodeURIComponent(rule!.id)}`, {
@@ -95,12 +108,27 @@ export function Toolbar({ onTest, onOpenRuleSettings, onOpenAiDraft }: Props = {
         toast.error(data.error ?? "Save failed");
         return;
       }
-      toast.success("Rule saved");
+      toast.success(errors.length > 0 ? "Saved with validation errors" : "Rule saved");
       markClean();
     } finally {
       setBusy(false);
     }
   }
+  saveRef.current = save;
+
+  // Cmd/Ctrl+S → save (no-op if not dirty or already busy)
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+        e.preventDefault();
+        if (dirtyRef.current && !busyRef.current) {
+          void saveRef.current();
+        }
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
     <header className="px-4 h-14 border-b bg-background shrink-0 flex items-center gap-3">
@@ -181,7 +209,13 @@ export function Toolbar({ onTest, onOpenRuleSettings, onOpenAiDraft }: Props = {
           {dirty ? "Unsaved" : "Saved"}
         </span>
 
-        <Button variant="default" size="sm" onClick={save} disabled={busy || !dirty}>
+        <Button
+          variant="default"
+          size="sm"
+          onClick={() => void save()}
+          disabled={busy || !dirty}
+          title={dirty ? "Save (⌘S)" : "All changes saved"}
+        >
           <Save className="w-3.5 h-3.5" /> Save
         </Button>
       </div>
