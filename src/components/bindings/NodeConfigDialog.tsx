@@ -37,6 +37,7 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
   const rule = useRuleStore((s) => s.rule);
   const nodeDefs = useNodesStore((s) => s.nodes);
   const setNodeBindings = useRuleStore((s) => s.setNodeBindings);
+  const updateInstance = useRuleStore((s) => s.updateInstance);
   const removeInstance = useRuleStore((s) => s.removeInstance);
   const select = useRuleStore((s) => s.select);
 
@@ -44,16 +45,21 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
   const def = instance ? nodeDefs.find((n) => n.id === instance.nodeId) : undefined;
   const initialBindings = rule?.bindings[instanceId];
 
-  // Local draft — committed only on Save
+  // Local draft — committed only on Save. Includes label and description
+  // edits so renames don't escape via accidental close.
   const [draft, setDraft] = useState<Record<string, PortBinding>>(initialBindings?.bindings ?? {});
+  const [labelDraft, setLabelDraft] = useState<string>(instance?.label ?? "");
+  const [descriptionDraft, setDescriptionDraft] = useState<string>(instance?.description ?? "");
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
       setDraft(initialBindings?.bindings ?? {});
+      setLabelDraft(instance?.label ?? "");
+      setDescriptionDraft(instance?.description ?? "");
       setAdvancedOpen(false);
     }
-  }, [open, initialBindings]);
+  }, [open, initialBindings, instance?.label, instance?.description]);
 
   if (!rule || !instance || !def) return null;
 
@@ -73,18 +79,33 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
   }
 
   function commit() {
+    // Persist bindings
     setNodeBindings(instanceId, {
       instanceId,
       ruleId: rule!.id,
       bindings: draft,
       extras: initialBindings?.extras,
     });
+    // Persist label/description on the instance. Trim and treat empty as
+    // "unset" — that way a wiped field falls back to def.name on display.
+    const trimmedLabel = labelDraft.trim();
+    const trimmedDesc = descriptionDraft.trim();
+    if ((instance!.label ?? "") !== trimmedLabel || (instance!.description ?? "") !== trimmedDesc) {
+      updateInstance(instanceId, (i) => ({
+        ...i,
+        label: trimmedLabel || undefined,
+        description: trimmedDesc || undefined,
+      }));
+    }
     onClose();
   }
 
   // Guard against accidental close-with-unsaved-changes — Esc or backdrop click
   // would otherwise silently discard the draft.
-  const hasUnsavedChanges = !shallowEqualBindings(draft, initialBindings?.bindings ?? {});
+  const hasUnsavedChanges =
+    !shallowEqualBindings(draft, initialBindings?.bindings ?? {}) ||
+    (instance.label ?? "") !== labelDraft.trim() ||
+    (instance.description ?? "") !== descriptionDraft.trim();
 
   function tryClose() {
     if (hasUnsavedChanges) {
@@ -121,12 +142,42 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
         {/* Body — sections per port. For nodes with no configurable ports
             (rare — terminals, simple merge), show a friendly empty state. */}
         <div className="flex-1 overflow-auto px-6 py-5 flex flex-col gap-5">
+          {/* Identity — label + description. These travel with the node-instance
+              (not the bindings), so a third-party reading the canvas can scan
+              "filter for AU market" without opening every node. Default placeholder
+              uses def.name so an unedited card still reads sensibly. */}
+          <section className="flex flex-col gap-2">
+            <label className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground/80 font-semibold">
+              Identity
+            </label>
+            <div className="flex flex-col gap-1.5">
+              <Input
+                value={labelDraft}
+                onChange={(e) => setLabelDraft(e.target.value)}
+                placeholder={def.name}
+                className="h-8 text-[13px] font-medium"
+                aria-label="Node label"
+              />
+              <textarea
+                value={descriptionDraft}
+                onChange={(e) => setDescriptionDraft(e.target.value)}
+                placeholder={`What does this ${def.category} do in this rule? (e.g. "Filter for AU market" — shown on the canvas card)`}
+                rows={2}
+                className="w-full text-[12.5px] leading-snug rounded-md border border-input bg-background px-3 py-1.5 outline-none focus:ring-2 focus:ring-foreground/20 placeholder:text-muted-foreground/70 resize-y min-h-[44px] max-h-[120px]"
+                aria-label="Node description"
+              />
+            </div>
+            <p className="text-[10.5px] text-muted-foreground/70">
+              Label and description are per-instance. The default label is the node-def name; the description shows on the canvas card so the rule reads as prose.
+            </p>
+          </section>
+
           {primary.length === 0 && advanced.length === 0 ? (
             <div className="rounded-md border border-dashed bg-muted/30 px-4 py-6 text-center">
-              <p className="text-[13px] text-foreground font-medium">Nothing to configure</p>
+              <p className="text-[13px] text-foreground font-medium">No ports to wire up</p>
               <p className="text-[11.5px] text-muted-foreground mt-1 max-w-sm mx-auto">
-                This node has no configurable ports — it works the same in every rule. Rename it
-                via the canvas (double-click) or remove it via the Delete button below.
+                This node has no configurable ports — it works the same in every rule.
+                Edit its label and description above, or remove it via the Delete button below.
               </p>
             </div>
           ) : null}

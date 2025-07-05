@@ -119,8 +119,8 @@ function CanvasInner() {
         // ResizeObserver replace them with actual measured DOM bounds — which
         // is what triggers handle-bounds scanning. Setting `width`/`height`
         // directly suppresses that and edges never compute endpoints.
-        const initialWidth = isTerminal ? 140 : 220;
-        const initialHeight = isTerminal ? 40 : 64;
+        const initialWidth = isTerminal ? 140 : 240;
+        const initialHeight = isTerminal ? 40 : 84;
         return {
           id: inst.instanceId,
           type: "ruleforgeNode",

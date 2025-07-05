@@ -39,6 +39,8 @@ export function RuleEditorClient({ initial }: { initial: Rule }) {
   const rule = useRuleStore((s) => s.rule);
   const selection = useRuleStore((s) => s.selection);
   const select = useRuleStore((s) => s.select);
+  const editingInstanceId = useRuleStore((s) => s.editingInstanceId);
+  const requestEdit = useRuleStore((s) => s.requestEdit);
   const nodeDefs = useNodesStore((s) => s.nodes);
   const loadNodes = useNodesStore((s) => s.load);
   const loadReferences = useReferencesStore((s) => s.load);
@@ -48,14 +50,15 @@ export function RuleEditorClient({ initial }: { initial: Rule }) {
   const [ruleSheetOpen, setRuleSheetOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
 
-  // When a node is selected, decide whether it gets the new centred dialog
-  // or the legacy side sheet. Filter nodes get the dialog (unified config);
-  // everything else keeps the sheet for now.
-  const selectedInstance = selection.kind === "node" && rule
-    ? rule.instances.find((i) => i.instanceId === selection.id)
+  // The configure dialog opens ONLY when an explicit "edit" gesture sets
+  // editingInstanceId — single-click on a node just selects (and lets it
+  // drag freely). The cog icon on the node, the right-click context menu,
+  // and double-click on the node body all set this.
+  const editingInstance = editingInstanceId && rule
+    ? rule.instances.find((i) => i.instanceId === editingInstanceId)
     : undefined;
-  const selectedDef = selectedInstance ? nodeDefs.find((n) => n.id === selectedInstance.nodeId) : undefined;
-  const useUnifiedDialog = !!selectedDef && UNIFIED_DIALOG_CATEGORIES.has(selectedDef.category);
+  const editingDef = editingInstance ? nodeDefs.find((n) => n.id === editingInstance.nodeId) : undefined;
+  const useUnifiedDialog = !!editingDef && UNIFIED_DIALOG_CATEGORIES.has(editingDef.category);
 
   useEffect(() => {
     load(initial);
@@ -151,8 +154,8 @@ export function RuleEditorClient({ initial }: { initial: Rule }) {
               />
               <NodeConfigDialog
                 open={useUnifiedDialog && tab === "graph"}
-                onClose={() => select({ kind: "none" })}
-                instanceId={selection.kind === "node" ? selection.id : ""}
+                onClose={() => requestEdit(null)}
+                instanceId={editingInstanceId ?? ""}
               />
               <AiDraftSheet open={aiOpen} onClose={() => setAiOpen(false)} />
             </div>
