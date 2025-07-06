@@ -627,7 +627,21 @@ function ArrayValuesEditor({
     return <MarketsPicker value={seed} onChange={(b) => onChange(b)} />;
   }
 
-  const isRefSelect = binding?.kind === "ref-select";
+  // When the port has a `defaultRef` and the user hasn't picked anything yet,
+  // act as if "From reference" was already selected with the default table —
+  // ref-bound filters (cabin, pax-type) open straight to the picker so the
+  // user doesn't have to swap tabs. The binding only commits to the draft
+  // when the user actually edits something in the picker.
+  const effectiveBinding =
+    binding ??
+    (port.defaultRef && allowsRefSelect
+      ? {
+          kind: "ref-select" as const,
+          referenceId: port.defaultRef.referenceId,
+          valueColumn: port.defaultRef.valueColumn ?? "",
+        }
+      : undefined);
+  const isRefSelect = effectiveBinding?.kind === "ref-select";
 
   return (
     <div className="flex flex-col gap-2">
@@ -648,7 +662,17 @@ function ArrayValuesEditor({
           <button
             type="button"
             onClick={() => {
-              if (binding?.kind !== "ref-select") onChange({ kind: "ref-select", referenceId: "", valueColumn: "" });
+              if (binding?.kind !== "ref-select") {
+                // Pre-fill with the port's natural reference if it has one
+                // (e.g. cabin filter → ref-cabin-classes). The user can still
+                // change the dropdown — this just spares them the question
+                // "which table?" for nodes that obviously map to one.
+                onChange({
+                  kind: "ref-select",
+                  referenceId: port.defaultRef?.referenceId ?? "",
+                  valueColumn: port.defaultRef?.valueColumn ?? "",
+                });
+              }
             }}
             className={cn(
               "px-3 h-7 text-[12px] font-medium rounded transition-colors",
@@ -661,7 +685,7 @@ function ArrayValuesEditor({
       ) : null}
 
       {isRefSelect ? (
-        <RefSelectInline binding={binding as Extract<PortBinding, { kind: "ref-select" }>} onChange={(b) => onChange(b)} />
+        <RefSelectInline binding={effectiveBinding as Extract<PortBinding, { kind: "ref-select" }>} onChange={(b) => onChange(b)} />
       ) : (
         <textarea
           rows={6}

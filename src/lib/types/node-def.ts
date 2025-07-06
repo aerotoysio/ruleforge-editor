@@ -75,6 +75,18 @@ export type NodePort = {
    * Default (omitted): all kinds compatible with the port's type are shown.
    */
   bindingKinds?: PortBinding["kind"][];
+  /**
+   * The reference table this port naturally pairs with — pre-selected when
+   * the user picks "From reference" so they don't have to guess "which table?"
+   * for nodes that obviously map to one (cabin filter → ref-cabin-classes,
+   * pax-type filter → ref-pax-types). Optional — they can still change it.
+   */
+  defaultRef?: {
+    /** Reference table id (e.g. "ref-pax-types"). */
+    referenceId: string;
+    /** Column whose values are returned. Defaults to first column when omitted. */
+    valueColumn?: string;
+  };
 };
 
 export type NodeOutput = {
