@@ -12,6 +12,8 @@ import type {
   NodeDef,
   NodeBindings,
   JsonSchema,
+  OutputTemplate,
+  OutputTemplateSummary,
 } from "@/lib/types";
 
 const SETTINGS_FILE = path.join(os.homedir(), ".ruleforge-editor.json");
@@ -63,7 +65,7 @@ export async function writeSettings(next: Partial<AppSettings>): Promise<AppSett
   return merged;
 }
 
-const DIRS = ["rules", "nodes", "samples", "refs"];
+const DIRS = ["rules", "nodes", "samples", "refs", "templates"];
 
 export async function seedWorkspace(rootPath: string, name?: string): Promise<WorkspaceConfig> {
   await fs.mkdir(rootPath, { recursive: true });
@@ -407,6 +409,83 @@ export async function writeReference(rootPath: string, ref: ReferenceSet): Promi
 
 export async function deleteReference(rootPath: string, id: string): Promise<void> {
   const filePath = path.join(rootPath, "refs", `${safeName(id)}.json`);
+  await fs.unlink(filePath).catch(() => {});
+}
+
+// ----- Output templates -------------------------------------------------
+
+export async function listTemplates(rootPath: string): Promise<OutputTemplateSummary[]> {
+  const dir = path.join(rootPath, "templates");
+  try {
+    const files = (await fs.readdir(dir)).filter((f) => f.endsWith(".json"));
+    const out: OutputTemplateSummary[] = [];
+    for (const f of files) {
+      try {
+        const raw = await fs.readFile(path.join(dir, f), "utf-8");
+        const t = JSON.parse(raw) as OutputTemplate;
+        out.push({
+          id: t.id,
+          name: t.name,
+          description: t.description,
+          category: t.category,
+          updatedAt: t.updatedAt,
+          fieldCount: (t.fields ?? []).length,
+        });
+      } catch {
+        // skip invalid template
+      }
+    }
+    return out.sort((a, b) => {
+      const c = (a.category ?? "").localeCompare(b.category ?? "");
+      return c !== 0 ? c : a.name.localeCompare(b.name);
+    });
+  } catch {
+    return [];
+  }
+}
+
+export async function readTemplate(rootPath: string, id: string): Promise<OutputTemplate | null> {
+  const filePath = path.join(rootPath, "templates", `${safeName(id)}.json`);
+  try {
+    const raw = await fs.readFile(filePath, "utf-8");
+    return JSON.parse(raw) as OutputTemplate;
+  } catch {
+    return null;
+  }
+}
+
+export async function listTemplatesFull(rootPath: string): Promise<OutputTemplate[]> {
+  const dir = path.join(rootPath, "templates");
+  try {
+    const files = (await fs.readdir(dir)).filter((f) => f.endsWith(".json"));
+    const out: OutputTemplate[] = [];
+    for (const f of files) {
+      try {
+        const raw = await fs.readFile(path.join(dir, f), "utf-8");
+        out.push(JSON.parse(raw) as OutputTemplate);
+      } catch {
+        // skip
+      }
+    }
+    return out.sort((a, b) => a.name.localeCompare(b.name));
+  } catch {
+    return [];
+  }
+}
+
+export async function writeTemplate(rootPath: string, tpl: OutputTemplate): Promise<void> {
+  const dir = path.join(rootPath, "templates");
+  await fs.mkdir(dir, { recursive: true });
+  const next: OutputTemplate = { ...tpl, updatedAt: new Date().toISOString() };
+  await fs.writeFile(
+    path.join(dir, `${safeName(tpl.id)}.json`),
+    JSON.stringify(next, null, 2),
+    "utf-8",
+  );
+}
+
+export async function deleteTemplate(rootPath: string, id: string): Promise<void> {
+  const filePath = path.join(rootPath, "templates", `${safeName(id)}.json`);
   await fs.unlink(filePath).catch(() => {});
 }
 

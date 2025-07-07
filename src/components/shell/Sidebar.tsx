@@ -7,6 +7,7 @@ import {
   Boxes,
   FlaskConical,
   Database,
+  LayoutTemplate,
   Settings,
   Hammer,
   FolderOpen,
@@ -24,6 +25,7 @@ type Item = {
 const ITEMS: Item[] = [
   { href: "/rules", label: "Rules", icon: FileCog, group: "build" },
   { href: "/nodes", label: "Nodes", icon: Boxes, group: "build" },
+  { href: "/templates", label: "Templates", icon: LayoutTemplate, group: "build" },
   { href: "/references", label: "References", icon: Database, group: "data" },
   { href: "/samples", label: "Samples", icon: FlaskConical, group: "data" },
   { href: "/settings", label: "Settings", icon: Settings, group: "system" },
