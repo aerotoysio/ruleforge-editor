@@ -236,6 +236,31 @@ export async function writeRule(rootPath: string, rule: Rule): Promise<string> {
   };
   await fs.writeFile(path.join(ruleDir, "rule.json"), JSON.stringify(onDisk, null, 2), "utf-8");
 
+  // Engine-shaped sibling — best-effort. The editor's rule.json is the
+  // source of truth for authoring; rule.engine.json is what the engine
+  // host actually reads. Compile failures are logged but don't block save
+  // (the rule may have incomplete bindings during authoring).
+  try {
+    const { compileRuleForEngine } = await import("@/lib/rule/compile-to-engine");
+    const [nodeDefs, refs, templates, assets] = await Promise.all([
+      listNodeDefs(rootPath),
+      listReferences(rootPath),
+      listTemplatesFull(rootPath),
+      listAssetsFull(rootPath),
+    ]);
+    const engineRule = compileRuleForEngine(rule, nodeDefs, { refs, templates, assets });
+    await fs.writeFile(
+      path.join(ruleDir, "rule.engine.json"),
+      JSON.stringify(engineRule, null, 2),
+      "utf-8",
+    );
+  } catch (err) {
+    // Don't block save; surface error to the API caller via the response.
+    // (Caller writes a `compileWarnings` field; for now just log.)
+    // eslint-disable-next-line no-console
+    console.warn(`[workspace] compile-to-engine failed for rule ${rule.id}:`, (err as Error).message);
+  }
+
   // Schemas
   await fs.writeFile(path.join(ruleDir, "schema", "input.json"), JSON.stringify(rule.inputSchema, null, 2), "utf-8");
   await fs.writeFile(path.join(ruleDir, "schema", "output.json"), JSON.stringify(rule.outputSchema, null, 2), "utf-8");
