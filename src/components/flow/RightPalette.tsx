@@ -19,44 +19,57 @@ export type PaletteDragPayload =
 
 export const PALETTE_DND_TYPE = "application/x-ruleforge-palette";
 
-// Engine team flagged: these categories are declared but currently throw
-// NotSupportedException at evaluation time. The editor lets you author against
-// them, but we surface a "pending" indicator so business users aren't surprised
-// when the rule won't run.
-const UNSUPPORTED_CATEGORIES: NodeCategory[] = ["api", "sql", "product", "reference", "logic"];
+// Engine support status — tracks categories the engine has not yet wired up.
+// As of ENGINE_CAPABILITIES.md (post-production-grade bundle) all 20 ship.
+const UNSUPPORTED_CATEGORIES: NodeCategory[] = [];
 
+// Palette ordering — Decision and Data-flow groups float to the top; less-
+// common categories (array transforms, external) sit lower so they don't crowd
+// the everyday filter / mutator workflow.
 const GROUP_ORDER: NodeCategory[] = [
   "input",
   "output",
-  "iterator",
-  "merge",
   "filter",
+  "logic",
+  "switch",
+  "assert",
+  "bucket",
+  "constant",
+  "product",
   "mutator",
   "calc",
-  "constant",
-  "ruleRef",
-  "logic",
-  "product",
   "reference",
-  "sql",
+  "iterator",
+  "merge",
+  "sort",
+  "limit",
+  "distinct",
+  "groupBy",
   "api",
+  "ruleRef",
 ];
 
 const GROUP_LABEL: Record<NodeCategory, string> = {
   input: "Terminals",
   output: "Terminals",
-  iterator: "Control flow",
-  merge: "Control flow",
-  filter: "Filters",
-  mutator: "Mutators",
+  filter: "Decision",
+  logic: "Decision",
+  switch: "Decision",
+  assert: "Decision",
+  bucket: "Decision",
+  constant: "Data flow",
+  product: "Data flow",
+  mutator: "Data flow",
   calc: "Compute",
-  constant: "Compute",
-  ruleRef: "Composition",
-  logic: "Logic",
-  product: "Output",
-  reference: "Reference",
-  sql: "External",
+  reference: "Compute",
+  iterator: "Iteration",
+  merge: "Iteration",
+  sort: "Array transform",
+  limit: "Array transform",
+  distinct: "Array transform",
+  groupBy: "Array transform",
   api: "External",
+  ruleRef: "Composition",
 };
 
 export function RightPalette() {

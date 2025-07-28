@@ -12,21 +12,29 @@ import { Select } from "@/components/ui/Select";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { slugify } from "@/lib/slug";
 
+// All 20 categories the engine currently implements (per ENGINE_CAPABILITIES.md).
+// `supported` is now a historic flag — we keep it but everything's supported.
 const CATEGORIES: { value: NodeCategory; label: string; supported: boolean }[] = [
-  { value: "input",     label: "Input",     supported: true  },
-  { value: "output",    label: "Output",    supported: true  },
-  { value: "iterator",  label: "Iterator",  supported: true  },
-  { value: "merge",     label: "Merge",     supported: true  },
-  { value: "filter",    label: "Filter",    supported: true  },
-  { value: "mutator",   label: "Mutator",   supported: true  },
-  { value: "calc",      label: "Calc",      supported: true  },
-  { value: "constant",  label: "Constant",  supported: true  },
-  { value: "ruleRef",   label: "Sub-rule",  supported: true  },
-  { value: "logic",     label: "Logic",     supported: false },
-  { value: "product",   label: "Product",   supported: false },
-  { value: "reference", label: "Reference", supported: false },
-  { value: "sql",       label: "SQL",       supported: false },
-  { value: "api",       label: "API",       supported: false },
+  { value: "input",     label: "Input",      supported: true },
+  { value: "output",    label: "Output",     supported: true },
+  { value: "constant",  label: "Constant",   supported: true },
+  { value: "product",   label: "Product",    supported: true },
+  { value: "mutator",   label: "Mutator",    supported: true },
+  { value: "filter",    label: "Filter",     supported: true },
+  { value: "logic",     label: "Logic",      supported: true },
+  { value: "switch",    label: "Switch",     supported: true },
+  { value: "assert",    label: "Assert",     supported: true },
+  { value: "bucket",    label: "Bucket",     supported: true },
+  { value: "calc",      label: "Calc",       supported: true },
+  { value: "reference", label: "Reference",  supported: true },
+  { value: "api",       label: "API",        supported: true },
+  { value: "iterator",  label: "Iterator",   supported: true },
+  { value: "merge",     label: "Merge",      supported: true },
+  { value: "sort",      label: "Sort",       supported: true },
+  { value: "limit",     label: "Limit",      supported: true },
+  { value: "distinct",  label: "Distinct",   supported: true },
+  { value: "groupBy",   label: "Group by",   supported: true },
+  { value: "ruleRef",   label: "Sub-rule",   supported: true },
 ];
 
 const PORT_TYPES: NodePortType[] = [

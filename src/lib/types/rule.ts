@@ -14,21 +14,33 @@ export type HttpMethodKind = "GET" | "POST";
 
 export type RuleStatus = "draft" | "review" | "published";
 
+/**
+ * The 20 node categories the engine implements.
+ * Mirrors the `data.category` enum in the engine's `rule.schema.json` —
+ * keep this list in lock-step with engine releases. (`sql` was retired
+ * upstream; keep it out.)
+ */
 export type NodeCategory =
   | "input"
   | "output"
-  | "logic"
-  | "filter"
-  | "product"
-  | "sql"
-  | "api"
-  | "reference"
-  | "ruleRef"
-  | "calc"
   | "constant"
+  | "product"
   | "mutator"
+  | "filter"
+  | "logic"
+  | "switch"
+  | "assert"
+  | "bucket"
+  | "calc"
+  | "reference"
+  | "api"
   | "iterator"
-  | "merge";
+  | "merge"
+  | "sort"
+  | "limit"
+  | "distinct"
+  | "groupBy"
+  | "ruleRef";
 
 export type EdgeBranch = "pass" | "fail" | "default";
 
