@@ -5,6 +5,7 @@ import { Workflow, Braces, FlaskConical } from "lucide-react";
 import type { Rule, RuleTest } from "@/lib/types";
 import { useRuleStore } from "@/lib/store/rule-store";
 import { useReferencesStore } from "@/lib/store/references-store";
+import { useTemplatesStore } from "@/lib/store/templates-store";
 import { useNodesStore } from "@/lib/store/nodes-store";
 import { Canvas } from "@/components/flow/Canvas";
 import { Toolbar } from "@/components/flow/Toolbar";
@@ -44,6 +45,7 @@ export function RuleEditorClient({ initial }: { initial: Rule }) {
   const nodeDefs = useNodesStore((s) => s.nodes);
   const loadNodes = useNodesStore((s) => s.load);
   const loadReferences = useReferencesStore((s) => s.load);
+  const loadTemplates = useTemplatesStore((s) => s.load);
   const [tab, setTab] = useState<Tab>("graph");
   const [testOpen, setTestOpen] = useState(false);
   const [testPrefill, setTestPrefill] = useState<RuleTest | null>(null);
@@ -64,7 +66,8 @@ export function RuleEditorClient({ initial }: { initial: Rule }) {
     load(initial);
     loadNodes();
     loadReferences();
-  }, [initial, load, loadNodes, loadReferences]);
+    loadTemplates();
+  }, [initial, load, loadNodes, loadReferences, loadTemplates]);
 
   useEffect(() => {
     function onBeforeUnload(e: BeforeUnloadEvent) {

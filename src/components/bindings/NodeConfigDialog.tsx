@@ -414,6 +414,14 @@ function PortEditor({
         />
       );
     }
+    // Literal-only object / object-array port — JSON textarea. Powers
+    // switch.cases (object-array of {match, name}), bucket.buckets
+    // (object-array of {name, weight}), api.headers / responseMap, and
+    // mutator.matchOn. We accept the JSON live so the user gets parse
+    // errors as they type rather than at Save.
+    if (port.bindingKinds?.includes("literal")) {
+      return <JsonLiteralEditor port={port} binding={binding} onChange={onChange} />;
+    }
   }
 
   // string-array / number-array — values port. Shuttle for ref-select, otherwise textarea.
@@ -924,6 +932,78 @@ function prettyTypeOf(node: SchemaPathNode): string {
   if (node.type === "string" && (fmt === "date" || fmt === "date-time")) return "date";
   if (node.type === "string" && fmt === "email") return "email";
   return node.type;
+}
+
+// ------------------------------------------------------------------
+// JSON literal editor — for object / object-array ports whose only
+// allowed binding kind is `literal`. Authors author the structure
+// inline (cases for switch, buckets for bucket, headers for api).
+// ------------------------------------------------------------------
+
+function JsonLiteralEditor({
+  port,
+  binding,
+  onChange,
+}: {
+  port: NodePort;
+  binding: PortBinding | undefined;
+  onChange: (b: PortBinding | null) => void;
+}) {
+  const initial = useMemo(() => {
+    if (binding?.kind === "literal") {
+      if (typeof binding.value === "string") return binding.value;
+      return JSON.stringify(binding.value, null, 2);
+    }
+    return port.type === "object-array" ? "[\n  \n]" : "{\n  \n}";
+  }, [binding, port.type]);
+
+  const [text, setText] = useState(initial);
+  const [error, setError] = useState<string | null>(null);
+
+  // If the binding changes externally (e.g. dialog reopen), resync.
+  useEffect(() => {
+    setText(initial);
+    setError(null);
+  }, [initial]);
+
+  const placeholder =
+    port.type === "object-array"
+      ? port.name === "cases"
+        ? '[\n  { "match": "gold",   "name": "premium" },\n  { "match": "silver", "name": "standard" }\n]'
+        : port.name === "buckets"
+        ? '[\n  { "name": "treatment", "weight": 50 },\n  { "name": "control",   "weight": 50 }\n]'
+        : "[\n  { ... }\n]"
+      : '{ "key": "value" }';
+
+  return (
+    <div className="flex flex-col gap-1">
+      <textarea
+        rows={6}
+        value={text}
+        onChange={(e) => {
+          const next = e.target.value;
+          setText(next);
+          if (next.trim() === "") {
+            onChange(null);
+            setError(null);
+            return;
+          }
+          try {
+            const parsed = JSON.parse(next);
+            onChange({ kind: "literal", value: parsed });
+            setError(null);
+          } catch (err) {
+            setError((err as Error).message);
+          }
+        }}
+        placeholder={placeholder}
+        className="w-full text-[12px] font-mono px-2.5 py-1.5 rounded-md border border-border bg-background focus:outline-none focus:ring-2 focus:ring-foreground/30"
+      />
+      {error ? (
+        <span className="text-[10.5px] text-amber-700 dark:text-amber-400">{error}</span>
+      ) : null}
+    </div>
+  );
 }
 
 function shallowEqualBindings(a: Record<string, PortBinding>, b: Record<string, PortBinding>): boolean {
