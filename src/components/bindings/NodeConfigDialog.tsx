@@ -940,6 +940,64 @@ function prettyTypeOf(node: SchemaPathNode): string {
 // inline (cases for switch, buckets for bucket, headers for api).
 // ------------------------------------------------------------------
 
+/**
+ * Per-port "row schema" for object-array ports we want a structured editor for.
+ * If a port name matches a key here, the dialog renders a structured row form
+ * (with a "View as JSON" escape hatch); otherwise it falls back to a plain
+ * JSON textarea.
+ *
+ * Mirrors the engine's per-config Config record shape for the matching port —
+ * cases for SwitchConfig.cases, buckets for BucketConfig.buckets. Edit only
+ * when the engine schema changes.
+ */
+type RowField = {
+  field: string;
+  label: string;
+  type: "string" | "number" | "any";
+  required?: boolean;
+  placeholder?: string;
+  description?: string;
+};
+
+const STRUCTURED_ROW_SCHEMAS: Record<string, RowField[]> = {
+  cases: [
+    {
+      field: "match",
+      label: "Match",
+      type: "any",
+      required: true,
+      placeholder: '"gold" / 1 / true',
+      description: "Compared with the switch's input value (== exact match).",
+    },
+    {
+      field: "name",
+      label: "Case name",
+      type: "string",
+      required: true,
+      placeholder: "premium",
+      description: "Emitted as the switch's output when this case wins.",
+    },
+  ],
+  buckets: [
+    {
+      field: "name",
+      label: "Bucket name",
+      type: "string",
+      required: true,
+      placeholder: "treatment",
+      description: "Emitted as the bucket node's output.",
+    },
+    {
+      field: "weight",
+      label: "Weight",
+      type: "number",
+      required: true,
+      placeholder: "50",
+      description: "Relative weight; ratios determine assignment probability.",
+    },
+  ],
+};
+
 function JsonLiteralEditor({
   port,
   binding,
@@ -949,6 +1007,10 @@ function JsonLiteralEditor({
   binding: PortBinding | undefined;
   onChange: (b: PortBinding | null) => void;
 }) {
+  const rowSchema = port.type === "object-array" ? STRUCTURED_ROW_SCHEMAS[port.name] : undefined;
+  const [mode, setMode] = useState<"structured" | "json">(rowSchema ? "structured" : "json");
+
+  // ── JSON mode ──────────────────────────────────────────────────────────
   const initial = useMemo(() => {
     if (binding?.kind === "literal") {
       if (typeof binding.value === "string") return binding.value;
@@ -966,7 +1028,17 @@ function JsonLiteralEditor({
     setError(null);
   }, [initial]);
 
-  const placeholder =
+  // ── Structured mode ────────────────────────────────────────────────────
+  const rows: Record<string, unknown>[] =
+    binding?.kind === "literal" && Array.isArray(binding.value)
+      ? (binding.value as Record<string, unknown>[])
+      : [];
+
+  function commitRows(next: Record<string, unknown>[]) {
+    onChange({ kind: "literal", value: next });
+  }
+
+  const jsonPlaceholder =
     port.type === "object-array"
       ? port.name === "cases"
         ? '[\n  { "match": "gold",   "name": "premium" },\n  { "match": "silver", "name": "standard" }\n]'
@@ -976,33 +1048,217 @@ function JsonLiteralEditor({
       : '{ "key": "value" }';
 
   return (
-    <div className="flex flex-col gap-1">
-      <textarea
-        rows={6}
-        value={text}
+    <div className="flex flex-col gap-2">
+      {/* Mode toggle — only when a structured schema exists for this port */}
+      {rowSchema ? (
+        <div className="flex items-center justify-between">
+          <div className="inline-flex rounded-md border bg-muted/40 p-0.5 self-start">
+            <button
+              type="button"
+              onClick={() => setMode("structured")}
+              className={cn(
+                "px-2.5 h-6 text-[11px] font-medium rounded transition-colors",
+                mode === "structured"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Structured
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("json")}
+              className={cn(
+                "px-2.5 h-6 text-[11px] font-medium rounded transition-colors",
+                mode === "json"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Raw JSON
+            </button>
+          </div>
+          {mode === "structured" ? (
+            <button
+              type="button"
+              onClick={() => commitRows([...rows, blankRow(rowSchema)])}
+              className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+              title="Add a new row"
+            >
+              + Add row
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* Structured row editor */}
+      {rowSchema && mode === "structured" ? (
+        <StructuredRowEditor
+          rowSchema={rowSchema}
+          rows={rows}
+          onChange={commitRows}
+        />
+      ) : (
+        <>
+          <textarea
+            rows={6}
+            value={text}
+            onChange={(e) => {
+              const next = e.target.value;
+              setText(next);
+              if (next.trim() === "") {
+                onChange(null);
+                setError(null);
+                return;
+              }
+              try {
+                const parsed = JSON.parse(next);
+                onChange({ kind: "literal", value: parsed });
+                setError(null);
+              } catch (err) {
+                setError((err as Error).message);
+              }
+            }}
+            placeholder={jsonPlaceholder}
+            className="w-full text-[12px] font-mono px-2.5 py-1.5 rounded-md border border-border bg-background focus:outline-none focus:ring-2 focus:ring-foreground/30"
+          />
+          {error ? (
+            <span className="text-[10.5px] text-amber-700 dark:text-amber-400">{error}</span>
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+}
+
+function blankRow(rowSchema: RowField[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const f of rowSchema) {
+    out[f.field] = f.type === "number" ? 0 : "";
+  }
+  return out;
+}
+
+function StructuredRowEditor({
+  rowSchema,
+  rows,
+  onChange,
+}: {
+  rowSchema: RowField[];
+  rows: Record<string, unknown>[];
+  onChange: (next: Record<string, unknown>[]) => void;
+}) {
+  function patchRow(idx: number, field: string, value: unknown) {
+    const next = rows.map((r, i) => (i === idx ? { ...r, [field]: value } : r));
+    onChange(next);
+  }
+  function removeRow(idx: number) {
+    onChange(rows.filter((_, i) => i !== idx));
+  }
+
+  if (rows.length === 0) {
+    return (
+      <div className="rounded border border-dashed bg-muted/30 px-3 py-3 text-[11.5px] text-muted-foreground italic">
+        No rows yet. Click <strong className="font-medium not-italic">+ Add row</strong> to start.
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-md border bg-card divide-y">
+      {/* Header */}
+      <div
+        className="grid gap-2 px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium bg-muted/30"
+        style={{ gridTemplateColumns: rowSchema.map(() => "1fr").join(" ") + " 28px" }}
+      >
+        {rowSchema.map((f) => (
+          <div key={f.field} title={f.description}>
+            {f.label}
+            {f.required ? <span className="ml-0.5 text-red-700/80">*</span> : null}
+          </div>
+        ))}
+        <div />
+      </div>
+      {/* Rows */}
+      {rows.map((row, i) => (
+        <div
+          key={i}
+          className="grid gap-2 px-3 py-2 items-center"
+          style={{ gridTemplateColumns: rowSchema.map(() => "1fr").join(" ") + " 28px" }}
+        >
+          {rowSchema.map((f) => (
+            <RowCell
+              key={f.field}
+              field={f}
+              value={row[f.field]}
+              onChange={(v) => patchRow(i, f.field, v)}
+            />
+          ))}
+          <button
+            type="button"
+            onClick={() => removeRow(i)}
+            className="w-7 h-7 inline-flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+            title="Remove this row"
+            aria-label="Remove row"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RowCell({
+  field,
+  value,
+  onChange,
+}: {
+  field: RowField;
+  value: unknown;
+  onChange: (v: unknown) => void;
+}) {
+  if (field.type === "number") {
+    return (
+      <Input
+        type="number"
+        value={typeof value === "number" ? value : ""}
+        onChange={(e) => onChange(e.target.value === "" ? 0 : Number(e.target.value))}
+        placeholder={field.placeholder}
+        className="h-8 text-[12px]"
+      />
+    );
+  }
+  if (field.type === "any") {
+    // Type-detect on input — let the user write `42` or `true` or `"text"`
+    // and parse the JSON-like literal so engine receives the right type.
+    const display = value == null ? "" : typeof value === "string" ? value : JSON.stringify(value);
+    return (
+      <Input
+        value={display}
         onChange={(e) => {
-          const next = e.target.value;
-          setText(next);
-          if (next.trim() === "") {
-            onChange(null);
-            setError(null);
-            return;
-          }
+          const v = e.target.value;
+          if (v === "") return onChange("");
+          // Try strict JSON first (catches numbers, booleans, null, arrays).
           try {
-            const parsed = JSON.parse(next);
-            onChange({ kind: "literal", value: parsed });
-            setError(null);
-          } catch (err) {
-            setError((err as Error).message);
+            onChange(JSON.parse(v));
+          } catch {
+            onChange(v);
           }
         }}
-        placeholder={placeholder}
-        className="w-full text-[12px] font-mono px-2.5 py-1.5 rounded-md border border-border bg-background focus:outline-none focus:ring-2 focus:ring-foreground/30"
+        placeholder={field.placeholder}
+        className="h-8 text-[12px] font-mono"
       />
-      {error ? (
-        <span className="text-[10.5px] text-amber-700 dark:text-amber-400">{error}</span>
-      ) : null}
-    </div>
+    );
+  }
+  // string
+  return (
+    <Input
+      value={typeof value === "string" ? value : value == null ? "" : String(value)}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={field.placeholder}
+      className="h-8 text-[12px]"
+    />
   );
 }
 
