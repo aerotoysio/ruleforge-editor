@@ -38,6 +38,14 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
   // in the dialog header and palette, not on the canvas card (would be noisy).
   const userDescription = instance.description?.trim();
 
+  // Templates store powers the canvas-card summary for template-fill bindings —
+  // we want to show "Bag fee line · 3 fields" rather than the opaque
+  // "tmpl-bag-fee-line · 3 fields". CRITICAL: this hook MUST live before the
+  // `isTerminal` early return below, or React sees a different hook count
+  // for terminal vs non-terminal nodes and tears down the subtree.
+  const templates = useTemplatesStore((s) => s.templates);
+  const summary = describeBindings(bindings, def, templates);
+
   // When the node-def loads asynchronously and we suddenly grow extra handles
   // (per-branch pass/fail), React Flow needs to be told to re-scan the DOM —
   // otherwise edges with sourceHandle="pass" can't find their target handle
@@ -145,11 +153,8 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
     );
   }
 
-  // Templates store powers the canvas-card summary for template-fill
-  // bindings — we want to show "Bag fee line · 3 fields" rather than the
-  // opaque "tmpl-bag-fee-line · 3 fields".
-  const templates = useTemplatesStore((s) => s.templates);
-  const summary = describeBindings(bindings, def, templates);
+  // (`templates` + `summary` were hoisted to the top of the component above
+  // the isTerminal early return so the hook count stays constant.)
 
   // Stop the click from also triggering React Flow's node-select handler when
   // the user clicks the cog/trash icons — otherwise they'd both open the
