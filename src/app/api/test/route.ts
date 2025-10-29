@@ -2,12 +2,94 @@ import { NextResponse, type NextRequest } from "next/server";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { promises as fs } from "node:fs";
-import { getActiveRoot, readSettings, readRule } from "@/lib/server/workspace";
+import {
+  getActiveRoot,
+  readSettings,
+  readRule,
+  listRules,
+  listNodeDefs,
+  listReferences,
+  listTemplatesFull,
+  listAssetsFull,
+} from "@/lib/server/workspace";
+import { compileRuleForEngine, CompileError } from "@/lib/rule/compile-to-engine";
 
 type Body = {
   ruleId: string;
   payload: unknown;
 };
+
+/**
+ * Stage all editor-authored rules into the flat fixture layout the engine's
+ * `LocalFileRuleSource` expects:
+ *
+ *   <root>/.engine-staging/_endpoint-bindings.json    "POST /ep" → "ruleId@N"
+ *   <root>/.engine-staging/<ruleId>.v<N>.json          engine-shaped rule
+ *
+ * The engine resolves refs at `<fixtures>/../refs`, which falls into
+ * `<root>/refs/` — already where the editor keeps them. No symlink needed.
+ *
+ * Compile every rule on every test invocation. Cheap (a dozen JSON walks)
+ * and avoids stale staged rules surviving a code-only edit.
+ */
+async function stageEngineFixtures(root: string): Promise<{
+  fixturesDir: string;
+  errors: { ruleId: string; detail: string }[];
+}> {
+  const fixturesDir = path.join(root, ".engine-staging");
+  await fs.mkdir(fixturesDir, { recursive: true });
+
+  // Wipe stale .json files from a previous run — keeps the dir tidy and
+  // ensures a deleted editor rule doesn't keep serving from staging.
+  const existing = await fs.readdir(fixturesDir).catch(() => [] as string[]);
+  for (const f of existing) {
+    if (f.endsWith(".json")) {
+      await fs.unlink(path.join(fixturesDir, f)).catch(() => {});
+    }
+  }
+
+  const [summaries, nodeDefs, refs, templates, assets] = await Promise.all([
+    listRules(root),
+    listNodeDefs(root),
+    listReferences(root),
+    listTemplatesFull(root),
+    listAssetsFull(root),
+  ]);
+
+  const bindings: Record<string, string> = {};
+  const errors: { ruleId: string; detail: string }[] = [];
+
+  for (const summary of summaries) {
+    const rule = await readRule(root, summary.id);
+    if (!rule) continue;
+    try {
+      const engineRule = compileRuleForEngine(rule, nodeDefs, { refs, templates, assets });
+      const fileName = `${summary.id}.v${rule.currentVersion}.json`;
+      await fs.writeFile(
+        path.join(fixturesDir, fileName),
+        JSON.stringify(engineRule, null, 2),
+        "utf-8",
+      );
+      // Engine binding key: "<METHOD> <endpoint>"
+      const method = (rule.method ?? "POST").toUpperCase();
+      bindings[`${method} ${rule.endpoint}`] = `${summary.id}@${rule.currentVersion}`;
+    } catch (err) {
+      const detail =
+        err instanceof CompileError
+          ? `${err.instanceId}${err.portName ? `.${err.portName}` : ""}: ${err.message}`
+          : (err as Error).message;
+      errors.push({ ruleId: summary.id, detail });
+    }
+  }
+
+  await fs.writeFile(
+    path.join(fixturesDir, "_endpoint-bindings.json"),
+    JSON.stringify(bindings, null, 2),
+    "utf-8",
+  );
+
+  return { fixturesDir, errors };
+}
 
 export async function POST(req: NextRequest) {
   const root = await getActiveRoot();
@@ -34,6 +116,23 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Bridge the editor's per-rule directory layout into the flat fixture
+  // layout LocalFileRuleSource consumes. If THIS rule failed to compile,
+  // surface that error rather than handing the engine a missing fixture
+  // (which would just say "no rule bound to <endpoint>").
+  const { fixturesDir, errors } = await stageEngineFixtures(root);
+  const ruleCompileError = errors.find((e) => e.ruleId === body.ruleId);
+  if (ruleCompileError) {
+    return NextResponse.json(
+      {
+        error: "compile_failed",
+        detail: ruleCompileError.detail,
+        otherCompileErrors: errors.filter((e) => e.ruleId !== body.ruleId),
+      },
+      { status: 422 },
+    );
+  }
+
   const args = [
     "run",
     "--no-build",
@@ -46,7 +145,7 @@ export async function POST(req: NextRequest) {
     "--request",
     JSON.stringify(body.payload),
     "--fixtures",
-    path.join(root, "rules"),
+    fixturesDir,
     "--debug",
   ];
 
@@ -60,12 +159,13 @@ export async function POST(req: NextRequest) {
         stdout: result.stdout,
         stderr: result.stderr,
         code: result.code,
+        otherCompileErrors: errors,
       },
       { status: 502 },
     );
   }
 
-  return NextResponse.json({ envelope, stderr: result.stderr });
+  return NextResponse.json({ envelope, stderr: result.stderr, otherCompileErrors: errors });
 }
 
 async function spawnDotnet(args: string[], cwd: string): Promise<{ stdout: string; stderr: string; code: number }> {

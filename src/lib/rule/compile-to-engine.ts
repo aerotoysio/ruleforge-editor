@@ -441,17 +441,22 @@ function compileMutatorConfig(
     };
   }
 
-  // Set-property mode — pick `value` (literal) or `from` (path).
+  // Set-property mode — engine's MutatorConfig accepts EITHER `value`
+  // (literal) OR `from` (path/context string) plus the required `target`.
+  // The editor exposes them as separate ports (`value` for literal, `from`
+  // for path/context); compile picks whichever the user filled in.
+  const fromBinding = bindings.from;
+  if (fromBinding?.kind === "path") return { target, from: fromBinding.path };
+  if (fromBinding?.kind === "context") return { target, from: contextPath(fromBinding.key) };
+  if (fromBinding?.kind === "literal" && typeof fromBinding.value === "string") {
+    return { target, from: fromBinding.value };
+  }
+
   const valueBinding = bindings.value;
-  if (valueBinding?.kind === "path") {
-    return { target, from: valueBinding.path };
-  }
-  if (valueBinding?.kind === "context") {
-    return { target, from: contextPath(valueBinding.key) };
-  }
-  if (valueBinding?.kind === "literal") {
-    return { target, value: valueBinding.value };
-  }
+  if (valueBinding?.kind === "path") return { target, from: valueBinding.path };
+  if (valueBinding?.kind === "context") return { target, from: contextPath(valueBinding.key) };
+  if (valueBinding?.kind === "literal") return { target, value: valueBinding.value };
+
   return { target };
 }
 
