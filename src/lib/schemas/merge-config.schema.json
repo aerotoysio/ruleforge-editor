@@ -1,0 +1,30 @@
+{
+  "type": [
+    "object",
+    "null"
+  ],
+  "properties": {
+    "mode": {
+      "enum": [
+        "collect",
+        "count",
+        "sum",
+        "avg",
+        "min",
+        "max",
+        "first",
+        "last"
+      ],
+      "default": "collect"
+    },
+    "field": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    }
+  },
+  "$id": "https://ruleforge-docs.onrender.com/schemas/merge-config.schema.json",
+  "title": "Merge config"
+}

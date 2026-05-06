@@ -1,0 +1,132 @@
+{
+  "type": [
+    "object",
+    "null"
+  ],
+  "properties": {
+    "source": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "request",
+            "context",
+            "literal"
+          ]
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "literal": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "compare": {
+      "type": "object",
+      "properties": {
+        "operator": {
+          "enum": [
+            "equals",
+            "not_equals",
+            "starts_with",
+            "ends_with",
+            "contains",
+            "not_contains",
+            "in",
+            "not_in",
+            "regex",
+            "is_null",
+            "is_empty"
+          ]
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "values": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "default": null
+        },
+        "caseInsensitive": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "default": null
+        },
+        "trim": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "operator"
+      ]
+    },
+    "arraySelector": {
+      "enum": [
+        "any",
+        "all",
+        "none",
+        "first",
+        "only"
+      ]
+    },
+    "onMissing": {
+      "enum": [
+        "fail",
+        "pass",
+        "skip"
+      ]
+    },
+    "referenceId": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "referenceColumn": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "source",
+    "compare",
+    "arraySelector",
+    "onMissing"
+  ],
+  "$id": "https://ruleforge-docs.onrender.com/schemas/string-filter-config.schema.json",
+  "title": "String filter config"
+}

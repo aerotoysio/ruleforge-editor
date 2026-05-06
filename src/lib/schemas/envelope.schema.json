@@ -1,0 +1,113 @@
+{
+  "type": [
+    "object",
+    "null"
+  ],
+  "properties": {
+    "ruleId": {
+      "type": "string"
+    },
+    "ruleVersion": {
+      "type": "integer"
+    },
+    "decision": {
+      "enum": [
+        "apply",
+        "skip",
+        "error"
+      ]
+    },
+    "evaluatedAt": {
+      "type": "string"
+    },
+    "result": true,
+    "trace": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "nodeId": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string"
+          },
+          "durationMs": {
+            "type": "integer"
+          },
+          "outcome": {
+            "enum": [
+              "pass",
+              "fail",
+              "skip",
+              "error"
+            ]
+          },
+          "input": {
+            "default": null
+          },
+          "output": {
+            "default": null
+          },
+          "ctxRead": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "default": null
+          },
+          "ctxWritten": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "default": null
+          },
+          "subRuleRunId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "nodeId",
+          "startedAt",
+          "durationMs",
+          "outcome"
+        ]
+      },
+      "default": null
+    },
+    "durationMs": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "ruleId",
+    "ruleVersion",
+    "decision",
+    "evaluatedAt",
+    "result"
+  ],
+  "$id": "https://ruleforge-docs.onrender.com/schemas/envelope.schema.json",
+  "title": "Envelope (engine response)"
+}

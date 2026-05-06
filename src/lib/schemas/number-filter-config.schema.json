@@ -1,0 +1,138 @@
+{
+  "type": [
+    "object",
+    "null"
+  ],
+  "properties": {
+    "source": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "request",
+            "context",
+            "literal"
+          ]
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "literal": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "kind"
+      ]
+    },
+    "compare": {
+      "type": "object",
+      "properties": {
+        "operator": {
+          "enum": [
+            "equals",
+            "not_equals",
+            "gt",
+            "gte",
+            "lt",
+            "lte",
+            "between",
+            "not_between",
+            "in",
+            "not_in",
+            "is_null"
+          ]
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "default": null
+        },
+        "values": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "number"
+          },
+          "default": null
+        },
+        "min": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "default": null
+        },
+        "max": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "default": null
+        },
+        "minInclusive": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "default": null
+        },
+        "maxInclusive": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "default": null
+        },
+        "round": {
+          "enum": [
+            "floor",
+            "ceil",
+            "round",
+            null
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "operator"
+      ]
+    },
+    "arraySelector": {
+      "enum": [
+        "any",
+        "all",
+        "none",
+        "first",
+        "only"
+      ]
+    },
+    "onMissing": {
+      "enum": [
+        "fail",
+        "pass",
+        "skip"
+      ]
+    }
+  },
+  "required": [
+    "source",
+    "compare",
+    "arraySelector",
+    "onMissing"
+  ],
+  "$id": "https://ruleforge-docs.onrender.com/schemas/number-filter-config.schema.json",
+  "title": "Number filter config"
+}

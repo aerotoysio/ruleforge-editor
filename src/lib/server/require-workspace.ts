@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
-import { getActiveRoot } from "@/lib/server/workspace";
+import { getActiveRoot } from "./workspace";
 
-export default async function Home() {
+export async function requireWorkspace(): Promise<string> {
   const root = await getActiveRoot();
   if (!root) redirect("/settings");
-  redirect("/rules");
+  return root;
 }

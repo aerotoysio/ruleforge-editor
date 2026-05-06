@@ -1,0 +1,23 @@
+{
+  "type": [
+    "object",
+    "null"
+  ],
+  "properties": {
+    "expression": {
+      "type": "string"
+    },
+    "target": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "expression"
+  ],
+  "$id": "https://ruleforge-docs.onrender.com/schemas/calc-config.schema.json",
+  "title": "Calc config"
+}

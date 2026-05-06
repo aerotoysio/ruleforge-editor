@@ -1,0 +1,63 @@
+{
+  "type": [
+    "object",
+    "null"
+  ],
+  "properties": {
+    "target": {
+      "type": "string"
+    },
+    "value": {
+      "default": null
+    },
+    "from": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "lookup": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "properties": {
+        "referenceId": {
+          "type": "string"
+        },
+        "valueColumn": {
+          "type": "string"
+        },
+        "matchOn": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "required": [
+        "referenceId",
+        "valueColumn",
+        "matchOn"
+      ],
+      "default": null
+    },
+    "onMissing": {
+      "enum": [
+        "leave",
+        "clear",
+        "error"
+      ],
+      "default": "leave"
+    }
+  },
+  "required": [
+    "target"
+  ],
+  "$id": "https://ruleforge-docs.onrender.com/schemas/mutator-config.schema.json",
+  "title": "Mutator config"
+}

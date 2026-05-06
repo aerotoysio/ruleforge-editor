@@ -1,0 +1,62 @@
+{
+  "type": [
+    "object",
+    "null"
+  ],
+  "properties": {
+    "ruleId": {
+      "type": "string"
+    },
+    "inputMapping": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "outputMapping": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "onError": {
+      "enum": [
+        "skip",
+        "fail",
+        "default"
+      ]
+    },
+    "defaultValue": true,
+    "pinnedVersion": true,
+    "forEach": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "as": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "ruleId",
+    "inputMapping",
+    "outputMapping",
+    "onError",
+    "defaultValue",
+    "pinnedVersion"
+  ],
+  "$id": "https://ruleforge-docs.onrender.com/schemas/sub-rule-call.schema.json",
+  "title": "Sub-rule call (with optional forEach)"
+}
