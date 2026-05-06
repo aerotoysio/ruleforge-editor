@@ -9,7 +9,7 @@ import { Select } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
 import { emptyPayload } from "@/lib/schema/empty-payload";
 import { slugify } from "@/lib/slug";
-import type { Envelope, Sample, TraceOutcome } from "@/lib/types";
+import type { Envelope, RuleTest, TraceOutcome } from "@/lib/types";
 
 type Props = {
   open: boolean;
@@ -19,17 +19,21 @@ type Props = {
 
 export function TestPanel({ open, onClose, prefill }: Props) {
   const rule = useRuleStore((s) => s.rule);
+  const upsertTest = useRuleStore((s) => s.upsertTest);
   const setTrace = useRuleStore((s) => s.setTrace);
   const [payload, setPayload] = useState("{}");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [envelope, setEnvelope] = useState<Envelope | null>(null);
   const [stderr, setStderr] = useState<string | null>(null);
-  const [samples, setSamples] = useState<Sample[]>([]);
-  const [activeSampleId, setActiveSampleId] = useState<string>("");
+  const [activeTestId, setActiveTestId] = useState<string>("");
   const [saveMode, setSaveMode] = useState(false);
   const [saveName, setSaveName] = useState("");
   const [prefillBanner, setPrefillBanner] = useState<string | null>(null);
+
+  // The dropdown reads the rule's per-rule tests directly — no API call.
+  // This is the same store the Tests tab edits, so changes propagate live.
+  const tests = rule?.tests ?? [];
 
   useEffect(() => {
     if (open && rule && payload === "{}") {
@@ -37,11 +41,11 @@ export function TestPanel({ open, onClose, prefill }: Props) {
     }
   }, [open, rule, payload]);
 
-  // Apply prefill (e.g. from /test page navigation): populate payload, optionally auto-run.
+  // Apply prefill (e.g. user clicked Run on a test in the Tests tab): populate payload, optionally auto-run.
   useEffect(() => {
     if (!open || !prefill || !rule) return;
     setPayload(JSON.stringify(prefill.payload, null, 2));
-    setActiveSampleId("");
+    setActiveTestId("");
     setError(null);
     setEnvelope(null);
     setStderr(null);
@@ -53,28 +57,12 @@ export function TestPanel({ open, onClose, prefill }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefill?.key, open, rule?.id]);
 
-  useEffect(() => {
-    if (!open || !rule) return;
-    void refreshSamples(rule.id);
-  }, [open, rule?.id]);
-
-  async function refreshSamples(ruleId: string) {
-    try {
-      const res = await fetch(`/api/samples?ruleId=${encodeURIComponent(ruleId)}`);
-      if (!res.ok) return;
-      const data = (await res.json()) as { samples: Sample[] };
-      setSamples(data.samples ?? []);
-    } catch {
-      // ignore — feature is non-blocking
-    }
-  }
-
-  function loadSample(id: string) {
-    setActiveSampleId(id);
+  function loadTest(id: string) {
+    setActiveTestId(id);
     if (!id) return;
-    const s = samples.find((x) => x.id === id);
-    if (!s) return;
-    setPayload(JSON.stringify(s.payload, null, 2));
+    const t = tests.find((x) => x.id === id);
+    if (!t) return;
+    setPayload(JSON.stringify(t.payload, null, 2));
     setError(null);
     setEnvelope(null);
     setStderr(null);
@@ -83,14 +71,14 @@ export function TestPanel({ open, onClose, prefill }: Props) {
   function autoGenerate() {
     if (!rule) return;
     setPayload(JSON.stringify(emptyPayload(rule.inputSchema), null, 2));
-    setActiveSampleId("");
+    setActiveTestId("");
     setError(null);
   }
 
-  async function saveAsSample() {
+  async function saveAsTest() {
     if (!rule) return;
     if (!saveName.trim()) {
-      toast.error("Sample name is required");
+      toast.error("Test name is required");
       return;
     }
     let parsed: unknown;
@@ -100,29 +88,18 @@ export function TestPanel({ open, onClose, prefill }: Props) {
       toast.error("Payload isn't valid JSON: " + (e as Error).message);
       return;
     }
-    const id = slugify(saveName);
-    const sample: Sample = {
+    const id = slugify(`${rule.id}-${saveName}`) || `test-${Date.now()}`;
+    const test: RuleTest = {
       id,
-      ruleId: rule.id,
       name: saveName.trim(),
       payload: parsed,
       updatedAt: new Date().toISOString(),
     };
-    const res = await fetch("/api/samples", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(sample),
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      toast.error(data.error ?? "Failed to save sample");
-      return;
-    }
-    toast.success(`Saved sample "${sample.name}"`);
+    upsertTest(test);
+    toast.success(`Saved test "${test.name}" — remember to Save the rule to persist to disk.`);
     setSaveMode(false);
     setSaveName("");
-    setActiveSampleId(id);
-    await refreshSamples(rule.id);
+    setActiveTestId(id);
   }
 
   async function run(overridePayload?: unknown) {
@@ -192,14 +169,14 @@ export function TestPanel({ open, onClose, prefill }: Props) {
         <div className="flex items-center gap-1.5 ml-3">
           <FlaskConical className="w-3.5 h-3.5" style={{ color: "var(--color-fg-muted)" }} />
           <Select
-            value={activeSampleId}
-            onChange={(e) => loadSample(e.target.value)}
+            value={activeTestId}
+            onChange={(e) => loadTest(e.target.value)}
             style={{ width: 240, height: 28 }}
-            title="Load saved sample"
+            title="Load a saved test scenario for this rule"
           >
-            <option value="">— sample —</option>
-            {samples.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
+            <option value="">{tests.length === 0 ? "— no tests yet —" : "— pick a test —"}</option>
+            {tests.map((t) => (
+              <option key={t.id} value={t.id}>{t.name}</option>
             ))}
           </Select>
         </div>
@@ -245,12 +222,12 @@ export function TestPanel({ open, onClose, prefill }: Props) {
           <Input
             value={saveName}
             onChange={(e) => setSaveName(e.target.value)}
-            placeholder="Sample name (e.g. Economy LHR-DXB 2 ADT)"
+            placeholder="Test name (e.g. Economy LHR-DXB 2 ADT)"
             className="flex-1"
             autoFocus
-            onKeyDown={(e) => { if (e.key === "Enter") void saveAsSample(); if (e.key === "Escape") { setSaveMode(false); setSaveName(""); } }}
+            onKeyDown={(e) => { if (e.key === "Enter") void saveAsTest(); if (e.key === "Escape") { setSaveMode(false); setSaveName(""); } }}
           />
-          <Button size="sm" variant="default" onClick={saveAsSample} disabled={!saveName.trim()}>
+          <Button size="sm" variant="default" onClick={saveAsTest} disabled={!saveName.trim()}>
             Save
           </Button>
           <Button size="sm" onClick={() => { setSaveMode(false); setSaveName(""); }}>

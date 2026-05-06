@@ -99,10 +99,58 @@ export type RuleNodeInstance = {
 
 /** Binds a single port to a path / literal / reference / context value. */
 export type PortBinding =
+  /** Resolve from a JSONPath into the rule's input (or context) tree. */
   | { kind: "path"; path: string }
+  /** A user-typed literal (string, number, array, object). */
   | { kind: "literal"; value: unknown }
+  /** Whole-table reference pointer (used by lookup-style nodes). */
   | { kind: "reference"; referenceId: string }
-  | { kind: "context"; key: string };
+  /** Iteration frame ($pax.foo) or $ctx.bar. */
+  | { kind: "context"; key: string }
+  /**
+   * Pick a set of values from a reference table. Used to author things like
+   * "destinations where country = US" or "pax types where category = paying"
+   * without hand-typing the resulting array. The engine flattens this to a
+   * literal array of valueColumn cells at evaluation time.
+   */
+  | {
+      kind: "ref-select";
+      referenceId: string;
+      /** Column whose values are returned (the resolved literal). */
+      valueColumn: string;
+      /** Optional column to filter rows by. Omit to take every row. */
+      whereColumn?: string;
+      /** Acceptable values for whereColumn (OR-joined). */
+      whereValues?: string[];
+    }
+  /**
+   * Authoring-time date control. The user picks a calendar mode and the engine
+   * receives a structured binding it can compare against any path-resolved
+   * date value. Supports absolute dates, relative windows, and the
+   * "abstraction layer" the user described — day-of-week, month, etc.
+   */
+  | {
+      kind: "date";
+      mode: "absolute" | "relative-window" | "day-of-week" | "day-of-month" | "month-of-year" | "is-weekend";
+      /** Used when mode = "absolute". ISO date YYYY-MM-DD. */
+      date?: string;
+      /** Used when mode = "relative-window". */
+      direction?: "next" | "last" | "this";
+      unit?: "days" | "weeks" | "months" | "years";
+      amount?: number;
+      /** Used for day-of-week/month-of-year etc. Multi-select. */
+      values?: number[];
+    }
+  /**
+   * Resolves to the number of items at an array path. Lets a number-typed port
+   * be wired to "count of pax", "count of bounds", "count of bundles", etc.
+   * without authoring a calc-expression. Used by the "if there are 2+ adults"
+   * pattern: bind filter source = count-of($.pax[*] where paxType=ADT) > 1.
+   */
+  | {
+      kind: "count-of";
+      arrayPath: string;
+    };
 
 /**
  * Per-rule, per-instance bindings. Persisted at /rules/[id]/bindings/[instanceId].json
