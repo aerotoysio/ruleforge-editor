@@ -35,40 +35,47 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
     : "";
 
   if (isTerminal) {
+    // Terminals are subtle pill chips with a coloured dot — much quieter
+    // than the previous fully-coloured pills, while keeping the pill shape
+    // as the visual cue that this is a start/end of the graph.
     return (
       <div
         className={cn(
-          "relative flex items-center justify-center gap-2 transition-all",
+          "relative flex items-center justify-center gap-2 transition-all border bg-card",
           outcomeStyle,
           selected ? "ring-2 ring-foreground ring-offset-2 ring-offset-background" : "",
         )}
         style={{
-          background: accent,
-          color: "#fff",
           borderRadius: 999,
+          borderColor: selected ? "var(--foreground)" : "var(--border)",
           width: 140,
           height: 40,
-          paddingLeft: 14,
-          paddingRight: 14,
+          paddingLeft: 12,
+          paddingRight: 12,
           boxShadow: selected
-            ? "0 4px 12px -2px rgba(0,0,0,0.2)"
-            : "0 1px 2px rgba(0,0,0,0.08), 0 2px 6px -1px rgba(0,0,0,0.06)",
+            ? "0 4px 12px -2px rgba(0,0,0,0.18)"
+            : "0 1px 2px rgba(0,0,0,0.06)",
         }}
       >
         {showTargetHandle ? (
           <Handle
             type="target"
             position={Position.Left}
-            style={{ background: "#fff", width: 10, height: 10, border: `2px solid ${accent}` }}
+            style={{ background: "var(--background)", width: 10, height: 10, border: `2px solid ${accent}` }}
           />
         ) : null}
-        <span className="text-[9.5px] font-semibold uppercase tracking-[0.08em] opacity-90">{badge}</span>
-        <span className="text-[13px] font-medium">{label}</span>
+        <span
+          className="w-2 h-2 rounded-full shrink-0"
+          style={{ background: accent }}
+          aria-hidden
+        />
+        <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{badge}</span>
+        <span className="text-[13px] font-medium text-foreground truncate">{label}</span>
         {showSourceHandle ? (
           <Handle
             type="source"
             position={Position.Right}
-            style={{ background: "#fff", width: 10, height: 10, border: `2px solid ${accent}` }}
+            style={{ background: "var(--background)", width: 10, height: 10, border: `2px solid ${accent}` }}
           />
         ) : null}
       </div>

@@ -1,12 +1,21 @@
 "use client";
 
-import { useMemo } from "react";
-import { GripVertical, AlertTriangle } from "lucide-react";
+import { useEffect, useMemo } from "react";
+import { GripVertical, AlertTriangle, Database } from "lucide-react";
 import Link from "next/link";
 import { useNodesStore } from "@/lib/store/nodes-store";
-import type { NodeDef, NodeCategory } from "@/lib/types";
+import { useReferencesStore } from "@/lib/store/references-store";
+import type { NodeDef, NodeCategory, ReferenceSet } from "@/lib/types";
 
-export type PaletteDragPayload = { kind: "node"; nodeId: string };
+export type PaletteDragPayload =
+  | { kind: "node"; nodeId: string }
+  /**
+   * Dropping a reference table onto the canvas creates a pre-wired
+   * node-mutator-lookup instance with referenceId already bound. The user
+   * just needs to fill in target/valueColumn/matchOn — they don't have
+   * to remember which ref-id to type.
+   */
+  | { kind: "reference"; referenceId: string };
 
 export const PALETTE_DND_TYPE = "application/x-ruleforge-palette";
 
@@ -53,6 +62,13 @@ const GROUP_LABEL: Record<NodeCategory, string> = {
 export function RightPalette() {
   const nodes = useNodesStore((s) => s.nodes);
   const loaded = useNodesStore((s) => s.loaded);
+  const refs = useReferencesStore((s) => s.references);
+  const refsLoaded = useReferencesStore((s) => s.loaded);
+  const loadRefs = useReferencesStore((s) => s.load);
+
+  useEffect(() => {
+    if (!refsLoaded) loadRefs();
+  }, [refsLoaded, loadRefs]);
 
   const grouped = useMemo(() => {
     const byGroup = new Map<string, NodeDef[]>();
@@ -102,19 +118,68 @@ export function RightPalette() {
             </Link>
           </div>
         ) : (
-          grouped.map(({ name, defs }) => (
-            <div key={name} className="mb-2">
-              <SectionHeader>{name}</SectionHeader>
-              <div className="flex flex-col gap-1.5 px-2">
-                {defs.map((def) => (
-                  <PaletteTile key={def.id} def={def} />
-                ))}
+          <>
+            {grouped.map(({ name, defs }) => (
+              <div key={name} className="mb-2">
+                <SectionHeader>{name}</SectionHeader>
+                <div className="flex flex-col gap-1.5 px-2">
+                  {defs.map((def) => (
+                    <PaletteTile key={def.id} def={def} />
+                  ))}
+                </div>
               </div>
-            </div>
-          ))
+            ))}
+
+            {/* References — drag a table onto the canvas to create a pre-wired lookup */}
+            {refs.length > 0 ? (
+              <div className="mb-2">
+                <SectionHeader>
+                  <span className="inline-flex items-center gap-1.5">
+                    <Database className="w-2.5 h-2.5" />
+                    Reference data
+                  </span>
+                </SectionHeader>
+                <div className="flex flex-col gap-1.5 px-2">
+                  {refs.map((r) => (
+                    <ReferenceTile key={r.id} ref={r} />
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </>
         )}
       </div>
     </aside>
+  );
+}
+
+function ReferenceTile({ ref: r }: { ref: ReferenceSet }) {
+  function onDragStart(e: React.DragEvent<HTMLDivElement>) {
+    const payload: PaletteDragPayload = { kind: "reference", referenceId: r.id };
+    const json = JSON.stringify(payload);
+    e.dataTransfer.setData(PALETTE_DND_TYPE, json);
+    e.dataTransfer.setData("text/plain", json);
+    e.dataTransfer.effectAllowed = "copy";
+  }
+
+  return (
+    <div
+      draggable
+      onDragStart={onDragStart}
+      className="group grid grid-cols-[auto_1fr_auto] gap-2 items-center px-2 py-2 rounded-md cursor-grab active:cursor-grabbing select-none bg-card border border-border hover:border-foreground/30 hover:shadow-sm transition-all"
+      title={`${r.name} — drag onto the canvas to create a pre-wired lookup node`}
+    >
+      <GripVertical className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
+      <div className="min-w-0">
+        <div className="text-[12.5px] font-medium leading-tight truncate text-foreground">{r.name}</div>
+        <div className="text-[10.5px] truncate text-muted-foreground mt-0.5">
+          {r.rows.length} rows · {r.columns.join(" · ")}
+        </div>
+      </div>
+      <span className="inline-flex items-center justify-center w-5 h-5 rounded text-muted-foreground/60">
+        <Database className="w-3 h-3" />
+      </span>
+    </div>
   );
 }
 
