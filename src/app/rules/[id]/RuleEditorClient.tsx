@@ -14,7 +14,13 @@ import { SettingsSheet } from "@/components/designer/SettingsSheet";
 import { AiDraftSheet } from "@/components/flow/AiDraftSheet";
 import { RuleSchemaTab } from "@/components/flow/RuleSchemaTab";
 import { RuleTestsTab } from "@/components/flow/RuleTestsTab";
+import { NodeConfigDialog } from "@/components/bindings/NodeConfigDialog";
 import { cn } from "@/lib/utils";
+
+// Categories that get the new unified single-popup config experience.
+// Other categories keep the per-port side sheet for now — we'll expand
+// as we validate the pattern.
+const UNIFIED_DIALOG_CATEGORIES = new Set(["filter"]);
 
 type Tab = "graph" | "schema" | "tests";
 
@@ -27,8 +33,10 @@ const TABS: { id: Tab; label: string; icon: typeof Workflow; description: string
 export function RuleEditorClient({ initial }: { initial: Rule }) {
   const load = useRuleStore((s) => s.load);
   const dirty = useRuleStore((s) => s.dirty);
+  const rule = useRuleStore((s) => s.rule);
   const selection = useRuleStore((s) => s.selection);
   const select = useRuleStore((s) => s.select);
+  const nodeDefs = useNodesStore((s) => s.nodes);
   const loadNodes = useNodesStore((s) => s.load);
   const loadReferences = useReferencesStore((s) => s.load);
   const [tab, setTab] = useState<Tab>("graph");
@@ -36,6 +44,15 @@ export function RuleEditorClient({ initial }: { initial: Rule }) {
   const [testPrefill, setTestPrefill] = useState<RuleTest | null>(null);
   const [ruleSheetOpen, setRuleSheetOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
+
+  // When a node is selected, decide whether it gets the new centred dialog
+  // or the legacy side sheet. Filter nodes get the dialog (unified config);
+  // everything else keeps the sheet for now.
+  const selectedInstance = selection.kind === "node" && rule
+    ? rule.instances.find((i) => i.instanceId === selection.id)
+    : undefined;
+  const selectedDef = selectedInstance ? nodeDefs.find((n) => n.id === selectedInstance.nodeId) : undefined;
+  const useUnifiedDialog = !!selectedDef && UNIFIED_DIALOG_CATEGORIES.has(selectedDef.category);
 
   useEffect(() => {
     load(initial);
@@ -55,7 +72,7 @@ export function RuleEditorClient({ initial }: { initial: Rule }) {
 
   const sheetMode: "selection" | "rule" | null =
     ruleSheetOpen ? "rule"
-    : (tab === "graph" && selection.kind !== "none") ? "selection"
+    : (tab === "graph" && selection.kind !== "none" && !useUnifiedDialog) ? "selection"
     : null;
 
   function runTest(t: RuleTest) {
@@ -124,6 +141,11 @@ export function RuleEditorClient({ initial }: { initial: Rule }) {
                   if (sheetMode === "rule") setRuleSheetOpen(false);
                   else select({ kind: "none" });
                 }}
+              />
+              <NodeConfigDialog
+                open={useUnifiedDialog && tab === "graph"}
+                onClose={() => select({ kind: "none" })}
+                instanceId={selection.kind === "node" ? selection.id : ""}
               />
               <AiDraftSheet open={aiOpen} onClose={() => setAiOpen(false)} />
             </div>
