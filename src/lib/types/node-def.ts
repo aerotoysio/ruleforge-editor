@@ -62,6 +62,19 @@ export type NodePort = {
    * Only valid for string-typed params.
    */
   enum?: NodeEnumOption[];
+  /**
+   * Restrict which binding "kinds" can author this port. The dialog hides
+   * tabs that aren't in this list — so the user isn't asked "from request
+   * or from a literal?" when only one of those makes sense for this port.
+   *
+   * Examples:
+   *   ["path","context"]  — port references a field; no literal/date/ref
+   *   ["date"]            — port wants a calendar predicate; no path/literal
+   *   ["literal","ref-select"] — fixed list of values
+   *
+   * Default (omitted): all kinds compatible with the port's type are shown.
+   */
+  bindingKinds?: PortBinding["kind"][];
 };
 
 export type NodeOutput = {
