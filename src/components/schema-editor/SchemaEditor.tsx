@@ -144,10 +144,10 @@ function RootObjectFields({ schema, onChange }: { schema: JsonSchema; onChange: 
       <AddField
         existingKeys={Object.keys(properties)}
         depth={0}
-        onAdd={(name, t) =>
+        onAdd={(name, fieldSchema) =>
           onChange({
             ...schema,
-            properties: { ...properties, [name]: { type: t } },
+            properties: { ...properties, [name]: fieldSchema },
           })
         }
       />
