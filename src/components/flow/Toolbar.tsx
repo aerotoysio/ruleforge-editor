@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { ArrowLeft, Save, Play, Settings2, Sparkles, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, Save, Play, Settings2, Sparkles, AlertTriangle, CheckCircle2, LayoutGrid, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { useRuleStore } from "@/lib/store/rule-store";
 import { useNodesStore } from "@/lib/store/nodes-store";
 import { validateRule, groupIssues, type ValidationIssue } from "@/lib/rule/validate";
+import { autoLayout } from "@/lib/flow/auto-layout";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { cn } from "@/lib/utils";
@@ -18,13 +20,59 @@ type Props = {
 };
 
 export function Toolbar({ onTest, onOpenRuleSettings, onOpenAiDraft }: Props = {}) {
+  const router = useRouter();
   const rule = useRuleStore((s) => s.rule);
   const select = useRuleStore((s) => s.select);
+  const setInstances = useRuleStore((s) => s.setInstances);
   const dirty = useRuleStore((s) => s.dirty);
   const markClean = useRuleStore((s) => s.markClean);
   const nodeDefs = useNodesStore((s) => s.nodes);
   const [busy, setBusy] = useState(false);
   const [issuesOpen, setIssuesOpen] = useState(false);
+
+  async function duplicate() {
+    if (!rule) return;
+    if (dirty && !confirm("You have unsaved changes — duplicate the saved version on disk and discard them?")) return;
+    setBusy(true);
+    try {
+      const baseId = rule.id;
+      const newId = await pickAvailableId(`${baseId}-copy`);
+      if (!newId) {
+        toast.error("Couldn't find an available id");
+        return;
+      }
+      // Fetch the saved-on-disk version (so unsaved drafts don't leak)
+      const res = await fetch(`/api/rules/${encodeURIComponent(baseId)}`);
+      if (!res.ok) {
+        toast.error("Failed to read original rule");
+        return;
+      }
+      const data = await res.json();
+      const next = {
+        ...data.rule,
+        id: newId,
+        name: `${data.rule.name} (copy)`,
+        status: "draft" as const,
+        currentVersion: 1,
+        updatedAt: new Date().toISOString(),
+        // Tests retain their ids — those are local to the rule scope
+      };
+      const writeRes = await fetch(`/api/rules/${encodeURIComponent(newId)}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(next),
+      });
+      if (!writeRes.ok) {
+        const err = await writeRes.json().catch(() => ({}));
+        toast.error(err.error ?? "Duplicate failed");
+        return;
+      }
+      toast.success(`Duplicated as "${next.name}"`);
+      router.push(`/rules/${encodeURIComponent(newId)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const issues = useMemo(
     () => (rule && nodeDefs.length > 0 ? validateRule(rule, nodeDefs) : []),
@@ -71,6 +119,29 @@ export function Toolbar({ onTest, onOpenRuleSettings, onOpenAiDraft }: Props = {
       </div>
 
       <div className="ml-auto flex items-center gap-1.5">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            if (!rule || rule.instances.length === 0) return;
+            const positions = autoLayout(
+              rule.instances.map((i) => ({ id: i.instanceId })),
+              rule.edges.map((e) => ({ source: e.source, target: e.target })),
+            );
+            const next = rule.instances.map((i) => {
+              const pos = positions.get(i.instanceId);
+              return pos ? { ...i, position: pos } : i;
+            });
+            setInstances(next);
+            toast.success("Re-laid out the canvas");
+          }}
+          title="Re-arrange nodes left-to-right by graph order"
+        >
+          <LayoutGrid className="w-3.5 h-3.5" /> Layout
+        </Button>
+        <Button variant="ghost" size="sm" onClick={duplicate} disabled={busy} title="Make a copy of this rule under a new id">
+          <Copy className="w-3.5 h-3.5" /> Duplicate
+        </Button>
         <Button variant="ghost" size="sm" onClick={() => onOpenAiDraft?.()} title="Draft from prompt via local Ollama">
           <Sparkles className="w-3.5 h-3.5" /> AI draft
         </Button>
@@ -116,6 +187,20 @@ export function Toolbar({ onTest, onOpenRuleSettings, onOpenAiDraft }: Props = {
       </div>
     </header>
   );
+}
+
+async function pickAvailableId(seed: string): Promise<string | null> {
+  // Try seed, seed-2, seed-3, … until /api/rules/[id] returns 404.
+  for (let n = 1; n <= 20; n++) {
+    const candidate = n === 1 ? seed : `${seed}-${n}`;
+    try {
+      const res = await fetch(`/api/rules/${encodeURIComponent(candidate)}`);
+      if (res.status === 404) return candidate;
+    } catch {
+      return candidate;
+    }
+  }
+  return null;
 }
 
 function ValidityBadge({
