@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
-import { GripVertical, AlertTriangle, Database } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { GripVertical, AlertTriangle, Database, Search, X } from "lucide-react";
 import Link from "next/link";
 import { useNodesStore } from "@/lib/store/nodes-store";
 import { useReferencesStore } from "@/lib/store/references-store";
@@ -65,15 +65,36 @@ export function RightPalette() {
   const refs = useReferencesStore((s) => s.references);
   const refsLoaded = useReferencesStore((s) => s.loaded);
   const loadRefs = useReferencesStore((s) => s.load);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     if (!refsLoaded) loadRefs();
   }, [refsLoaded, loadRefs]);
 
+  const q = query.trim().toLowerCase();
+  const filteredNodes = useMemo(() => {
+    if (!q) return nodes;
+    return nodes.filter((n) =>
+      n.name.toLowerCase().includes(q)
+      || n.description?.toLowerCase().includes(q)
+      || n.tags?.some((t) => t.toLowerCase().includes(q))
+      || n.category.toLowerCase().includes(q),
+    );
+  }, [nodes, q]);
+
+  const filteredRefs = useMemo(() => {
+    if (!q) return refs;
+    return refs.filter((r) =>
+      r.name.toLowerCase().includes(q)
+      || r.id.toLowerCase().includes(q)
+      || r.description?.toLowerCase().includes(q),
+    );
+  }, [refs, q]);
+
   const grouped = useMemo(() => {
     const byGroup = new Map<string, NodeDef[]>();
     for (const cat of GROUP_ORDER) byGroup.set(GROUP_LABEL[cat], []);
-    for (const def of nodes) {
+    for (const def of filteredNodes) {
       const groupName = GROUP_LABEL[def.category] ?? "Other";
       const arr = byGroup.get(groupName) ?? [];
       arr.push(def);
@@ -90,7 +111,7 @@ export function RightPalette() {
       if (defs.length) out.push({ name, defs: defs.sort((a, b) => a.name.localeCompare(b.name)) });
     }
     return out;
-  }, [nodes]);
+  }, [filteredNodes]);
 
   return (
     <aside className="w-64 shrink-0 flex flex-col border-l bg-muted/20 overflow-hidden">
@@ -106,6 +127,29 @@ export function RightPalette() {
           Manage
         </Link>
       </header>
+
+      <div className="px-3 py-2 border-b bg-background shrink-0">
+        <div className="relative">
+          <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground/60" />
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search nodes…"
+            className="w-full h-7 text-[12px] pl-7 pr-7 rounded-md border border-border bg-muted/30 focus:bg-background focus:outline-none focus:ring-2 focus:ring-foreground/20"
+          />
+          {query ? (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 w-4 h-4 inline-flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground"
+              title="Clear search"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          ) : null}
+        </div>
+      </div>
 
       <div className="flex-1 overflow-auto py-3">
         {!loaded ? (
@@ -131,7 +175,7 @@ export function RightPalette() {
             ))}
 
             {/* References — drag a table onto the canvas to create a pre-wired lookup */}
-            {refs.length > 0 ? (
+            {filteredRefs.length > 0 ? (
               <div className="mb-2">
                 <SectionHeader>
                   <span className="inline-flex items-center gap-1.5">
@@ -140,10 +184,17 @@ export function RightPalette() {
                   </span>
                 </SectionHeader>
                 <div className="flex flex-col gap-1.5 px-2">
-                  {refs.map((r) => (
+                  {filteredRefs.map((r) => (
                     <ReferenceTile key={r.id} ref={r} />
                   ))}
                 </div>
+              </div>
+            ) : null}
+
+            {/* No-results state when filter is active and nothing matches */}
+            {q && grouped.length === 0 && filteredRefs.length === 0 ? (
+              <div className="mx-2 px-3 py-3 text-[11.5px] text-muted-foreground rounded-md border border-dashed bg-card">
+                Nothing matches &ldquo;{query}&rdquo;.
               </div>
             ) : null}
           </>
