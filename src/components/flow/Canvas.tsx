@@ -79,9 +79,17 @@ function CanvasInner() {
         const dim = trace !== null && !traversed;
         const branch = e.branch ?? "default";
         const colour = branch === "pass" ? "var(--color-pass)" : branch === "fail" ? "var(--color-fail)" : "var(--color-default)";
+        // If the source node has per-branch handles (multiple non-default outputs)
+        // pin the edge's sourceHandle to the matching branch — otherwise the
+        // edge floats and may attach to the wrong handle.
+        const sourceInst = rule?.instances.find((i) => i.instanceId === e.source);
+        const sourceDef = sourceInst ? nodeDefs.find((n) => n.id === sourceInst.nodeId) : undefined;
+        const branchedOutputs = (sourceDef?.ports.outputs ?? []).filter((o) => o.branch && o.branch !== "default");
+        const sourceHandle = branchedOutputs.length >= 2 && (branch === "pass" || branch === "fail") ? branch : undefined;
         return {
           id: e.id,
           source: e.source,
+          sourceHandle,
           target: e.target,
           // Show a pill label only for pass/fail (default edges stay clean).
           label: branch !== "default" ? branch.toUpperCase() : undefined,
@@ -101,7 +109,7 @@ function CanvasInner() {
           selected: selection.kind === "edge" && selection.id === e.id,
         };
       }),
-    [rule?.edges, trace, selection],
+    [rule?.edges, rule?.instances, nodeDefs, trace, selection],
   );
 
   const onNodesChange = useCallback(
@@ -152,7 +160,14 @@ function CanvasInner() {
   const onConnect = useCallback(
     (conn: Connection) => {
       if (!conn.source || !conn.target) return;
-      const id = addEdge(conn.source, conn.target, "default");
+      // The source handle's id is the output port name. For per-branch
+      // handles (filter pass/fail), this is exactly the branch — derive it
+      // automatically so users don't have to set the branch on the edge.
+      const branch: "pass" | "fail" | "default" =
+        conn.sourceHandle === "pass" ? "pass"
+        : conn.sourceHandle === "fail" ? "fail"
+        : "default";
+      const id = addEdge(conn.source, conn.target, branch);
       if (id) select({ kind: "edge", id });
     },
     [addEdge, select],

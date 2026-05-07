@@ -181,11 +181,57 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
       </div>
 
       {showSourceHandle ? (
-        <Handle
-          type="source"
-          position={Position.Right}
-          style={{ background: "var(--muted-foreground)", width: 8, height: 8, border: "2px solid var(--background)" }}
-        />
+        (() => {
+          // If the node-def declares multiple branched outputs (e.g. filter
+          // → pass / fail), render one handle per output, vertically stacked
+          // and labelled with the branch tone. Dragging from the green
+          // handle creates a "pass" edge; from the red one, a "fail" edge.
+          const outputs = (def?.ports.outputs ?? []).filter((o) => o.branch && o.branch !== "default");
+          if (outputs.length >= 2) {
+            return (
+              <>
+                {outputs.map((out, i) => {
+                  const colour =
+                    out.branch === "pass" ? "var(--color-pass)"
+                    : out.branch === "fail" ? "var(--color-fail)"
+                    : "var(--color-default)";
+                  // Vertical positions: 30%, 70% for two handles; evenly spaced for more.
+                  const top = `${((i + 1) * 100) / (outputs.length + 1)}%`;
+                  return (
+                    <div key={out.name}>
+                      <Handle
+                        id={out.name}
+                        type="source"
+                        position={Position.Right}
+                        style={{
+                          top,
+                          background: colour,
+                          width: 10,
+                          height: 10,
+                          border: "2px solid var(--background)",
+                        }}
+                      />
+                      <span
+                        className="absolute right-3 text-[8.5px] font-semibold font-mono tracking-wider uppercase pointer-events-none"
+                        style={{ top, transform: "translateY(-50%)", color: colour }}
+                      >
+                        {out.name}
+                      </span>
+                    </div>
+                  );
+                })}
+              </>
+            );
+          }
+          // Single default output — one centred handle, unchanged
+          return (
+            <Handle
+              type="source"
+              position={Position.Right}
+              style={{ background: "var(--muted-foreground)", width: 8, height: 8, border: "2px solid var(--background)" }}
+            />
+          );
+        })()
       ) : null}
     </div>
   );
