@@ -1,15 +1,15 @@
 "use client";
 
-import { Trash2, Wand2, Quote, Database, BookOpen, Type, Filter, CalendarDays, Hash } from "lucide-react";
+import { useState } from "react";
+import { Trash2, Wand2, Quote, Database, Type, Filter, CalendarDays, Hash, Pencil } from "lucide-react";
 import { useRuleStore } from "@/lib/store/rule-store";
 import { useNodesStore } from "@/lib/store/nodes-store";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/button";
-import { PathPicker } from "@/components/path-picker/PathPicker";
-import { ReferenceMultiSelect } from "@/components/bindings/ReferenceMultiSelect";
-import { DateBindingPicker } from "@/components/bindings/DateBindingPicker";
 import { ObjectShapeEditor } from "@/components/bindings/ObjectShapeEditor";
+import { BindingPickerDialog } from "@/components/bindings/BindingPickerDialog";
 import { DesignerHeader } from "./DesignerHeader";
+import { cn } from "@/lib/utils";
 import type { NodeDef, NodePort, PortBinding } from "@/lib/types";
 
 export function NodeDesigner({ nodeId: instanceId }: { nodeId: string }) {
@@ -169,45 +169,12 @@ type PortBindingRowProps = {
   paramOnly?: boolean;
 };
 
-function PortBindingRow({ port, binding, onChange, inputSchema, paramOnly }: PortBindingRowProps) {
-  // ref-select is only useful when the port wants a list of values.
-  const allowsRefSelect = port.type === "string-array" || port.type === "number-array";
-  // Date picker is offered for date-typed ports.
-  const allowsDate = port.type === "date";
-  // count-of resolves to a number from an array path.
-  const allowsCountOf = port.type === "number" || port.type === "integer";
+function PortBindingRow({ port, binding, onChange, inputSchema }: PortBindingRowProps) {
+  const [dialogOpen, setDialogOpen] = useState(false);
 
-  const baseKinds: PortBinding["kind"][] = paramOnly
-    ? ["literal", "reference"]
-    : ["path", "context", "literal", "reference"];
-  const extras: PortBinding["kind"][] = [
-    ...(allowsRefSelect ? ["ref-select" as const] : []),
-    ...(allowsDate ? ["date" as const] : []),
-    ...(allowsCountOf && !paramOnly ? ["count-of" as const] : []),
-  ];
-  const kinds: PortBinding["kind"][] = [...baseKinds.slice(0, -1), ...extras, baseKinds[baseKinds.length - 1]];
-
-  const currentKind = binding?.kind ?? (allowsDate ? "date" : kinds[0]);
-
-  function changeKind(kind: PortBinding["kind"]) {
-    if (kind === "path") onChange({ kind: "path", path: "" });
-    else if (kind === "context") onChange({ kind: "context", key: "" });
-    else if (kind === "literal") onChange({ kind: "literal", value: "" });
-    else if (kind === "reference") onChange({ kind: "reference", referenceId: "" });
-    else if (kind === "ref-select") onChange({ kind: "ref-select", referenceId: "", valueColumn: "" });
-    else if (kind === "date") onChange({ kind: "date", mode: "absolute", date: new Date().toISOString().slice(0, 10) });
-    else if (kind === "count-of") onChange({ kind: "count-of", arrayPath: "" });
-  }
-
-  const KIND_LABEL: Record<PortBinding["kind"], string> = {
-    path: "path",
-    context: "context",
-    literal: "literal",
-    reference: "ref",
-    "ref-select": "from ref",
-    date: "date",
-    "count-of": "count",
-  };
+  // For boolean ports we keep an inline yes/no toggle — opening a dialog
+  // for that would be silly. Everything else routes through the dialog.
+  const inlineBoolean = port.type === "boolean";
 
   return (
     <div className="rounded-md border bg-card p-2.5 flex flex-col gap-2">
@@ -226,189 +193,141 @@ function PortBindingRow({ port, binding, onChange, inputSchema, paramOnly }: Por
         <p className="text-[11px] text-muted-foreground leading-snug">{port.description}</p>
       ) : null}
 
-      {/* Kind switcher */}
-      <div className="flex gap-1 flex-wrap">
-        {kinds.map((k) => (
-          <button
-            key={k}
-            type="button"
-            onClick={() => changeKind(k)}
-            className={
-              currentKind === k
-                ? "px-1.5 h-5 text-[10px] font-medium rounded bg-foreground text-background"
-                : "px-1.5 h-5 text-[10px] font-medium rounded bg-muted text-muted-foreground hover:bg-muted/70"
-            }
-          >
-            <span className="inline-flex items-center gap-1">
-              {k === "path" ? <Wand2 className="w-2.5 h-2.5" /> : null}
-              {k === "context" ? <Quote className="w-2.5 h-2.5" /> : null}
-              {k === "literal" ? <Type className="w-2.5 h-2.5" /> : null}
-              {k === "reference" ? <Database className="w-2.5 h-2.5" /> : null}
-              {k === "ref-select" ? <Filter className="w-2.5 h-2.5" /> : null}
-              {k === "date" ? <CalendarDays className="w-2.5 h-2.5" /> : null}
-              {k === "count-of" ? <Hash className="w-2.5 h-2.5" /> : null}
-              {KIND_LABEL[k]}
-            </span>
-          </button>
-        ))}
-        {binding ? (
+      {inlineBoolean ? (
+        <div className="flex gap-1.5">
           <button
             type="button"
-            onClick={() => onChange(null)}
-            className="ml-auto px-1.5 h-5 text-[10px] font-medium rounded text-muted-foreground hover:text-foreground"
-            title="Clear binding"
+            onClick={() => onChange({ kind: "literal", value: true })}
+            className={cn(
+              "h-8 px-3 text-[12px] font-medium rounded-md border transition-colors",
+              binding?.kind === "literal" && binding.value === true
+                ? "bg-foreground text-background border-foreground"
+                : "bg-card text-foreground border-border hover:border-foreground/30",
+            )}
           >
-            clear
+            Yes
           </button>
-        ) : null}
-      </div>
-
-      {/* Value editor for the selected kind */}
-      {binding ? <PortBindingValue binding={binding} port={port} onChange={onChange} inputSchema={inputSchema} /> : (
-        <div className="text-[10.5px] text-muted-foreground italic">Pick a binding kind above to wire this port.</div>
+          <button
+            type="button"
+            onClick={() => onChange({ kind: "literal", value: false })}
+            className={cn(
+              "h-8 px-3 text-[12px] font-medium rounded-md border transition-colors",
+              binding?.kind === "literal" && binding.value === false
+                ? "bg-foreground text-background border-foreground"
+                : "bg-card text-foreground border-border hover:border-foreground/30",
+            )}
+          >
+            No
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setDialogOpen(true)}
+          className={cn(
+            "w-full text-left rounded-md border px-2.5 py-2 transition-colors flex items-start gap-2",
+            binding
+              ? "bg-card border-border hover:border-foreground/30"
+              : "bg-muted/30 border-dashed border-border hover:border-foreground/30",
+          )}
+        >
+          <BindingValuePreview binding={binding} />
+          <Pencil className="w-3 h-3 text-muted-foreground/60 shrink-0 mt-0.5" />
+        </button>
       )}
-    </div>
-  );
-}
 
-function PortBindingValue({
-  binding,
-  port,
-  onChange,
-  inputSchema,
-}: {
-  binding: PortBinding;
-  port: NodePort;
-  onChange: (next: PortBinding) => void;
-  inputSchema: import("@/lib/types").JsonSchema;
-}) {
-  if (binding.kind === "path") {
-    return (
-      <PathPicker
-        schema={inputSchema}
-        value={binding.path}
-        onChange={(path) => onChange({ kind: "path", path })}
-        hint={port.hint}
-        placeholder="$.field.path"
-      />
-    );
-  }
-  if (binding.kind === "context") {
-    return (
-      <Input
-        value={binding.key}
-        onChange={(e) => onChange({ kind: "context", key: e.target.value })}
-        placeholder="pax.id  or  ctx.computedAge"
-      />
-    );
-  }
-  if (binding.kind === "literal") {
-    const isObjectish = port.type === "object" || port.type === "any";
-    if (isObjectish) {
-      return (
+      {/* Object-shape literals get a structured form below the preview tile. */}
+      {(port.type === "object" || port.type === "any") && binding?.kind === "literal" ? (
         <ObjectShapeEditor
           value={binding.value}
-          onChange={(next) => onChange({ kind: "literal", value: next })}
+          onChange={(v) => onChange({ kind: "literal", value: v })}
           inputSchema={inputSchema}
         />
-      );
-    }
-    if (port.type === "string-array" || port.type === "number-array") {
-      const arr = Array.isArray(binding.value) ? binding.value : [];
-      return (
-        <Input
-          value={arr.join(", ")}
-          onChange={(e) => {
-            const items = e.target.value.split(",").map((s) => s.trim()).filter(Boolean);
-            const value = port.type === "number-array" ? items.map((s) => Number(s)) : items;
-            onChange({ kind: "literal", value });
-          }}
-          placeholder={port.type === "number-array" ? "1, 2, 3" : "ADT, CHD, INF"}
-        />
-      );
-    }
-    if (port.type === "number" || port.type === "integer") {
-      return (
-        <Input
-          type="number"
-          value={typeof binding.value === "number" ? binding.value : ""}
-          onChange={(e) => onChange({ kind: "literal", value: e.target.value === "" ? "" : Number(e.target.value) })}
-        />
-      );
-    }
-    if (port.type === "boolean") {
-      return (
-        <select
-          className="w-full text-[12px] px-2 py-1.5 rounded border border-border bg-background"
-          value={binding.value === true ? "true" : binding.value === false ? "false" : ""}
-          onChange={(e) => onChange({ kind: "literal", value: e.target.value === "true" })}
-        >
-          <option value="">Pick…</option>
-          <option value="true">true</option>
-          <option value="false">false</option>
-        </select>
-      );
-    }
-    return (
-      <Input
-        value={typeof binding.value === "string" ? binding.value : JSON.stringify(binding.value)}
-        onChange={(e) => onChange({ kind: "literal", value: e.target.value })}
-        placeholder="literal value"
-      />
-    );
-  }
-  if (binding.kind === "reference") {
-    return (
-      <ReferenceBindingPicker
-        value={binding.referenceId}
-        onChange={(referenceId) => onChange({ kind: "reference", referenceId })}
-      />
-    );
-  }
-  if (binding.kind === "ref-select") {
-    return (
-      <ReferenceMultiSelect
-        value={binding}
-        onChange={(next) => onChange(next)}
-      />
-    );
-  }
-  if (binding.kind === "date") {
-    return <DateBindingPicker value={binding} onChange={(next) => onChange(next)} />;
-  }
-  if (binding.kind === "count-of") {
-    return (
-      <div className="flex flex-col gap-1.5">
-        <span className="text-[10.5px] uppercase tracking-wider text-muted-foreground/80 font-medium">
-          Count of items at
-        </span>
-        <PathPicker
-          schema={inputSchema}
-          value={binding.arrayPath}
-          onChange={(arrayPath) => onChange({ kind: "count-of", arrayPath })}
-          placeholder="$.passengers[*]"
-        />
-        <span className="text-[10.5px] text-muted-foreground italic">
-          Resolves to the number of items at this path. Useful for &ldquo;if there are 2+
-          adults&rdquo; type rules.
-        </span>
-      </div>
-    );
-  }
-  return null;
-}
+      ) : null}
 
-function ReferenceBindingPicker({ value, onChange }: { value: string; onChange: (id: string) => void }) {
-  // Lazy reference list — read from the editor's references store if available.
-  // Fallback: free text input.
-  return (
-    <div className="flex items-center gap-1.5">
-      <BookOpen className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-      <Input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="ref-airports"
+      <BindingPickerDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        port={port}
+        inputSchema={inputSchema}
+        initial={binding}
+        onSave={(b) => onChange(b)}
+        onClear={() => onChange(null)}
       />
     </div>
   );
 }
+
+function BindingValuePreview({ binding }: { binding: PortBinding | undefined }) {
+  if (!binding) {
+    return (
+      <span className="text-[12px] text-muted-foreground italic flex-1">
+        Click to bind…
+      </span>
+    );
+  }
+  const kindLabel = labelForKind(binding.kind);
+  const detail = describeForPreview(binding);
+  const Icon = iconForKind(binding.kind);
+  return (
+    <div className="flex-1 flex flex-col gap-0.5 min-w-0">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium flex items-center gap-1">
+        <Icon className="w-2.5 h-2.5" />
+        {kindLabel}
+      </div>
+      <div className="text-[12px] font-medium text-foreground truncate">{detail}</div>
+    </div>
+  );
+}
+
+function labelForKind(k: PortBinding["kind"]): string {
+  switch (k) {
+    case "path": return "From request";
+    case "context": return "From context";
+    case "literal": return "Literal";
+    case "reference": return "Reference table";
+    case "ref-select": return "From reference";
+    case "date": return "Date";
+    case "count-of": return "Count of";
+  }
+}
+
+function iconForKind(k: PortBinding["kind"]) {
+  if (k === "path") return Wand2;
+  if (k === "context") return Quote;
+  if (k === "literal") return Type;
+  if (k === "reference") return Database;
+  if (k === "ref-select") return Filter;
+  if (k === "date") return CalendarDays;
+  return Hash;
+}
+
+function describeForPreview(b: PortBinding): string {
+  if (b.kind === "path") return b.path || "(no path picked)";
+  if (b.kind === "context") return `$${b.key || "..."}`;
+  if (b.kind === "literal") {
+    if (Array.isArray(b.value)) return `${b.value.length} value${b.value.length === 1 ? "" : "s"}: ${b.value.slice(0, 4).join(", ")}${b.value.length > 4 ? "…" : ""}`;
+    if (typeof b.value === "string") return b.value || "(empty)";
+    if (typeof b.value === "object" && b.value !== null) {
+      const keys = Object.keys(b.value);
+      return keys.length ? `{ ${keys.slice(0, 3).join(", ")}${keys.length > 3 ? ", …" : ""} }` : "(empty object)";
+    }
+    return String(b.value);
+  }
+  if (b.kind === "ref-select") {
+    const n = b.whereValues?.length ?? 0;
+    return `${n} value${n === 1 ? "" : "s"} from ${b.referenceId || "(no reference)"}`;
+  }
+  if (b.kind === "reference") return b.referenceId || "(no reference)";
+  if (b.kind === "date") {
+    if (b.mode === "absolute") return b.date ?? "(pick a date)";
+    if (b.mode === "relative-window") return `within the ${b.direction} ${b.amount} ${b.unit}`;
+    if (b.mode === "day-of-week") return `weekday in ${(b.values ?? []).join(", ")}`;
+    if (b.mode === "month-of-year") return `month in ${(b.values ?? []).join(", ")}`;
+    if (b.mode === "is-weekend") return b.values?.[0] === 1 ? "is a weekend" : "is a weekday";
+    return b.mode;
+  }
+  if (b.kind === "count-of") return `count of ${b.arrayPath}`;
+  return "";
+}
+

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { Handle, Position, useUpdateNodeInternals, type NodeProps } from "@xyflow/react";
 import type { RuleNodeInstance, NodeDef, NodeBindings, PortBinding } from "@/lib/types";
 import { useRuleStore } from "@/lib/store/rule-store";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,16 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
   const accent = def?.ui?.accent ?? "#64748b";
   const badge = def?.ui?.badge ?? "?";
   const label = instance.label ?? def?.name ?? instance.nodeId;
+
+  // When the node-def loads asynchronously and we suddenly grow extra handles
+  // (per-branch pass/fail), React Flow needs to be told to re-scan the DOM —
+  // otherwise edges with sourceHandle="pass" can't find their target handle
+  // and silently disappear.
+  const updateInternals = useUpdateNodeInternals();
+  const handleCountKey = `${def?.id ?? "no-def"}:${(def?.ports.outputs ?? []).length}`;
+  useEffect(() => {
+    updateInternals(id);
+  }, [id, handleCountKey, updateInternals]);
 
   // Inline label edit — double-click the label to rename without opening the sheet.
   const [editing, setEditing] = useState(false);
