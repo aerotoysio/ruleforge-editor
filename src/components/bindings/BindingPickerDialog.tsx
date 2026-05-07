@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/Input";
 import { ReferenceMultiSelect } from "@/components/bindings/ReferenceMultiSelect";
 import { DateBindingPicker } from "@/components/bindings/DateBindingPicker";
+import { ObjectShapeEditor } from "@/components/bindings/ObjectShapeEditor";
 import { walkSchema, type SchemaPathNode } from "@/lib/schema/path-walker";
 import { cn } from "@/lib/utils";
 import type { JsonSchema, NodePort, PortBinding } from "@/lib/types";
@@ -110,7 +111,12 @@ export function BindingPickerDialog({ open, onClose, port, inputSchema, initial,
             ) : tab === "context" ? (
               <ContextPanel value={draftAsContext(draft)} onChange={(k) => setDraft({ kind: "context", key: k })} />
             ) : tab === "literal" ? (
-              <LiteralPanel port={port} value={draftAsLiteral(draft)} onChange={(v) => setDraft({ kind: "literal", value: v })} />
+              <LiteralPanel
+                port={port}
+                value={draftAsLiteral(draft)}
+                onChange={(v) => setDraft({ kind: "literal", value: v })}
+                inputSchema={inputSchema}
+              />
             ) : tab === "ref" ? (
               <ReferenceMultiSelect
                 value={draftAsRefSelect(draft)}
@@ -160,25 +166,128 @@ function SchemaTreePanel({
   const [filter, setFilter] = useState("");
   const f = filter.trim().toLowerCase();
 
+  // Flat list of every compatible path — surfaced as quick-pick chips at the
+  // top so the user sees "$.passengers" / "$.offer.bundles[*]" front-and-centre
+  // when binding an iterator's source port, instead of having to dig through
+  // the tree.
+  const compatibleChoices = useMemo(() => {
+    if (!tree) return [];
+    const flat: SchemaPathNode[] = [];
+    const visit = (n: SchemaPathNode) => {
+      if (n.depth > 0 && isCompatible(n, port.type)) flat.push(n);
+      n.children?.forEach(visit);
+    };
+    visit(tree);
+    // Apply filter if active
+    if (f) return flat.filter((n) => n.path.toLowerCase().includes(f) || (n.key?.toLowerCase().includes(f) ?? false));
+    return flat;
+  }, [tree, port.type, f]);
+
+  // Apply hint suggestions on top — these get the gold tier
+  const suggested = useMemo(() => {
+    if (!port.hint || compatibleChoices.length === 0) return [];
+    const namePatterns = port.hint.namePattern ? new RegExp(port.hint.namePattern, "i") : null;
+    const fieldPatterns = port.hint.fieldHint ? new RegExp(port.hint.fieldHint, "i") : null;
+    return compatibleChoices.filter((n) => {
+      const segments = n.path.split(/[.\[\]]+/);
+      const last = segments[segments.length - 1] || segments[segments.length - 2] || "";
+      if (fieldPatterns && fieldPatterns.test(last)) return true;
+      if (namePatterns && segments.some((s) => namePatterns.test(s))) return true;
+      return false;
+    }).slice(0, 6);
+  }, [port.hint, compatibleChoices]);
+
+  const showChipStrip = compatibleChoices.length > 0;
+
   return (
-    <div className="flex flex-col gap-2">
-      <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground/80 font-medium">
-        Pick a field from the request
+    <div className="flex flex-col gap-3">
+      <div>
+        <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground/80 font-medium mb-1.5">
+          Pick a field from the request
+        </div>
+        <Input
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Filter fields…"
+          className="font-mono"
+        />
       </div>
-      <Input
-        value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-        placeholder="Filter fields…"
-        className="font-mono"
-      />
-      <div className="rounded-md border bg-card p-2 max-h-[420px] overflow-auto">
-        {tree ? (
-          <SchemaTreeNode node={tree} selectedPath={value} onPick={onPick} portType={port.type} filter={f} />
-        ) : (
-          <div className="text-[11.5px] text-muted-foreground italic">No schema yet — add fields in the Schema tab.</div>
-        )}
+
+      {showChipStrip ? (
+        <div className="rounded-md border bg-muted/30 p-2 flex flex-col gap-1.5">
+          {suggested.length > 0 ? (
+            <>
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground/80 font-medium px-0.5">
+                Best match{suggested.length === 1 ? "" : "es"} for this port
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {suggested.map((n) => (
+                  <PathChip key={n.path} node={n} onPick={onPick} value={value} highlighted />
+                ))}
+              </div>
+              <div className="border-t border-border/60 mt-1.5 mb-1" />
+            </>
+          ) : null}
+          <div className="text-[10px] uppercase tracking-wider text-muted-foreground/80 font-medium px-0.5">
+            All compatible ({compatibleChoices.length})
+          </div>
+          <div className="flex flex-wrap gap-1 max-h-[140px] overflow-auto">
+            {compatibleChoices.slice(0, 60).map((n) => (
+              <PathChip key={n.path} node={n} onPick={onPick} value={value} />
+            ))}
+            {compatibleChoices.length > 60 ? (
+              <span className="text-[10.5px] font-mono text-muted-foreground italic px-1.5 h-5 inline-flex items-center">
+                +{compatibleChoices.length - 60} more in tree below
+              </span>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      <div>
+        <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground/80 font-medium mb-1">
+          Full structure
+        </div>
+        <div className="rounded-md border bg-card p-2 max-h-[260px] overflow-auto">
+          {tree ? (
+            <SchemaTreeNode node={tree} selectedPath={value} onPick={onPick} portType={port.type} filter={f} />
+          ) : (
+            <div className="text-[11.5px] text-muted-foreground italic">No schema yet — add fields in the Schema tab.</div>
+          )}
+        </div>
       </div>
     </div>
+  );
+}
+
+function PathChip({
+  node,
+  value,
+  onPick,
+  highlighted,
+}: {
+  node: SchemaPathNode;
+  value: string;
+  onPick: (p: string) => void;
+  highlighted?: boolean;
+}) {
+  const isActive = node.path === value;
+  return (
+    <button
+      type="button"
+      onClick={() => onPick(node.path)}
+      className={cn(
+        "font-mono text-[10.5px] px-1.5 h-6 rounded border transition-colors max-w-full truncate",
+        isActive
+          ? "bg-foreground text-background border-foreground"
+          : highlighted
+            ? "bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-900"
+            : "bg-background text-foreground border-border hover:border-foreground/30",
+      )}
+      title={`${node.path} · ${node.type}`}
+    >
+      {node.path}
+    </button>
   );
 }
 
@@ -291,7 +400,21 @@ function ContextPanel({ value, onChange }: { value: string; onChange: (key: stri
   );
 }
 
-function LiteralPanel({ port, value, onChange }: { port: NodePort; value: unknown; onChange: (v: unknown) => void }) {
+function LiteralPanel({ port, value, onChange, inputSchema }: { port: NodePort; value: unknown; onChange: (v: unknown) => void; inputSchema: JsonSchema }) {
+  if (port.type === "object" || port.type === "any") {
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground/80 font-medium">
+          Define the shape, field by field
+        </div>
+        <ObjectShapeEditor
+          value={value}
+          onChange={onChange}
+          inputSchema={inputSchema}
+        />
+      </div>
+    );
+  }
   if (port.type === "boolean") {
     return (
       <div className="flex gap-2">
@@ -463,12 +586,10 @@ function describePortBinding(b: PortBinding | undefined): string {
 function isCompatible(node: SchemaPathNode, portType: NodePort["type"]): boolean {
   const t = node.type;
   if (portType === "any") return true;
-  if (portType === "object" || portType === "object-array") {
-    return t === "object" || t === "array" || t === "any";
-  }
-  if (portType === "string-array" || portType === "number-array") {
-    return t === "array";
-  }
+  // Iterators / per-element binders want arrays specifically — NOT objects.
+  if (portType === "object-array") return t === "array" || t === "any";
+  if (portType === "object") return t === "object" || t === "any";
+  if (portType === "string-array" || portType === "number-array") return t === "array" || t === "any";
   if (portType === "string") return t === "string" || t === "any";
   if (portType === "number" || portType === "integer") return t === "number" || t === "integer" || t === "any";
   if (portType === "date") return t === "string" || t === "any"; // dates are strings in JSON Schema
