@@ -82,11 +82,23 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
     onClose();
   }
 
+  // Guard against accidental close-with-unsaved-changes — Esc or backdrop click
+  // would otherwise silently discard the draft.
+  const hasUnsavedChanges = !shallowEqualBindings(draft, initialBindings?.bindings ?? {});
+
+  function tryClose() {
+    if (hasUnsavedChanges) {
+      const ok = confirm("You have unsaved changes. Close without saving?");
+      if (!ok) return;
+    }
+    onClose();
+  }
+
   const accent = def.ui?.accent ?? "#64748b";
   const badge = def.ui?.badge ?? "?";
 
   return (
-    <Dialog open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
+    <Dialog open={open} onOpenChange={(next) => { if (!next) tryClose(); }}>
       <DialogContent className="max-w-[900px] sm:max-w-[900px] p-0 gap-0 flex flex-col h-[640px]">
         {/* Header */}
         <header className="px-5 pr-12 py-3 border-b shrink-0 flex items-center gap-3 bg-card">
@@ -177,9 +189,9 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
           </span>
 
           <div className="ml-auto flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
-            <Button variant="default" size="sm" onClick={commit}>
-              <Check className="w-3.5 h-3.5" /> Save
+            <Button variant="ghost" size="sm" onClick={tryClose}>Cancel</Button>
+            <Button variant="default" size="sm" onClick={commit} disabled={!hasUnsavedChanges}>
+              <Check className="w-3.5 h-3.5" /> {hasUnsavedChanges ? "Save" : "Saved"}
             </Button>
           </div>
         </footer>
@@ -716,6 +728,19 @@ function prettyTypeOf(node: SchemaPathNode): string {
   if (node.type === "string" && (fmt === "date" || fmt === "date-time")) return "date";
   if (node.type === "string" && fmt === "email") return "email";
   return node.type;
+}
+
+function shallowEqualBindings(a: Record<string, PortBinding>, b: Record<string, PortBinding>): boolean {
+  // Compare via JSON.stringify of each value — bindings are small structured
+  // objects; this is plenty fast and catches deep changes (e.g. include[]).
+  const ka = Object.keys(a);
+  const kb = Object.keys(b);
+  if (ka.length !== kb.length) return false;
+  for (const k of ka) {
+    if (!(k in b)) return false;
+    if (JSON.stringify(a[k]) !== JSON.stringify(b[k])) return false;
+  }
+  return true;
 }
 
 function humanLabel(portName: string): string {
