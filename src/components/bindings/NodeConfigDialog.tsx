@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Check, Wand2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Check, Wand2, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/Input";
@@ -37,6 +37,8 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
   const rule = useRuleStore((s) => s.rule);
   const nodeDefs = useNodesStore((s) => s.nodes);
   const setNodeBindings = useRuleStore((s) => s.setNodeBindings);
+  const removeInstance = useRuleStore((s) => s.removeInstance);
+  const select = useRuleStore((s) => s.select);
 
   const instance = rule?.instances.find((i) => i.instanceId === instanceId);
   const def = instance ? nodeDefs.find((n) => n.id === instance.nodeId) : undefined;
@@ -104,8 +106,18 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
           </div>
         </header>
 
-        {/* Body — sections per port */}
+        {/* Body — sections per port. For nodes with no configurable ports
+            (rare — terminals, simple merge), show a friendly empty state. */}
         <div className="flex-1 overflow-auto px-6 py-5 flex flex-col gap-5">
+          {primary.length === 0 && advanced.length === 0 ? (
+            <div className="rounded-md border border-dashed bg-muted/30 px-4 py-6 text-center">
+              <p className="text-[13px] text-foreground font-medium">Nothing to configure</p>
+              <p className="text-[11.5px] text-muted-foreground mt-1 max-w-sm mx-auto">
+                This node has no configurable ports — it works the same in every rule. Rename it
+                via the canvas (double-click) or remove it via the Delete button below.
+              </p>
+            </div>
+          ) : null}
           {primary.map((port) => (
             <PortSection
               key={port.name}
@@ -144,10 +156,26 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
         </div>
 
         {/* Footer */}
-        <footer className="px-5 py-3 border-t shrink-0 flex items-center bg-muted/20">
-          <span className="text-[10.5px] text-muted-foreground">
-            Saves to the rule. Click <strong>Save</strong> in the toolbar afterwards to persist to disk.
+        <footer className="px-5 py-3 border-t shrink-0 flex items-center bg-muted/20 gap-2">
+          {/* Delete on the left, padded away from save-cancel */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              if (!confirm(`Delete "${instance.label ?? def.name}" from this rule?`)) return;
+              removeInstance(instanceId);
+              select({ kind: "none" });
+              onClose();
+            }}
+            className="text-destructive hover:text-destructive"
+          >
+            <Trash2 className="w-3.5 h-3.5" /> Delete
+          </Button>
+
+          <span className="text-[10.5px] text-muted-foreground ml-3 hidden md:inline">
+            Saves to the rule in memory. Hit <strong>Save</strong> in the toolbar to persist to disk.
           </span>
+
           <div className="ml-auto flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
             <Button variant="default" size="sm" onClick={commit}>
