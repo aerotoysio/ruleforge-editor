@@ -10,6 +10,7 @@ import { useNodesStore } from "@/lib/store/nodes-store";
 import { useReferencesStore } from "@/lib/store/references-store";
 import { ShuttlePicker, type ShuttleItem } from "./ShuttlePicker";
 import { DateBindingPicker } from "./DateBindingPicker";
+import { MarketsPicker } from "./MarketsPicker";
 import { walkSchema, type SchemaPathNode } from "@/lib/schema/path-walker";
 import { cn } from "@/lib/utils";
 import type { JsonSchema, NodePort, PortBinding } from "@/lib/types";
@@ -514,7 +515,6 @@ function ArrayValuesEditor({
   binding: PortBinding | undefined;
   onChange: (b: PortBinding) => void;
 }) {
-  const refs = useReferencesStore((s) => s.references);
   const loaded = useReferencesStore((s) => s.loaded);
   const load = useReferencesStore((s) => s.load);
 
@@ -522,11 +522,22 @@ function ArrayValuesEditor({
     if (!loaded) load();
   }, [loaded, load]);
 
-  const isRefSelect = binding?.kind === "ref-select";
   const allowsRefSelect = !port.bindingKinds || port.bindingKinds.includes("ref-select");
   const allowsLiteral = !port.bindingKinds || port.bindingKinds.includes("literal");
+  const allowsMarkets = !!port.bindingKinds && port.bindingKinds.includes("markets-select");
 
-  // Mode tabs at the top (only show if both modes are allowed)
+  // If the port is markets-only (e.g. node-filter-markets.literal), render the
+  // markets picker directly — no mode toggle.
+  if (allowsMarkets && !allowsRefSelect && !allowsLiteral) {
+    const seed: Extract<PortBinding, { kind: "markets-select" }> =
+      binding?.kind === "markets-select"
+        ? binding
+        : { kind: "markets-select", referenceId: "ref-airports", valueColumn: "code", include: [], exclude: [] };
+    return <MarketsPicker value={seed} onChange={(b) => onChange(b)} />;
+  }
+
+  const isRefSelect = binding?.kind === "ref-select";
+
   return (
     <div className="flex flex-col gap-2">
       {(allowsRefSelect && allowsLiteral) ? (

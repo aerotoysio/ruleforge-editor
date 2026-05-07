@@ -176,6 +176,29 @@ export type PortBinding =
   | {
       kind: "count-of";
       arrayPath: string;
+    }
+  /**
+   * Hierarchical "markets" picker. Authors rules like "every airport in the
+   * USA except Texas, plus GVA" by combining inclusion + exclusion rules
+   * across columns of a reference table (typically ref-airports). The engine
+   * resolves this to a flat array of valueColumn cells at evaluation time:
+   *
+   *     1. union  : rows where ANY include-rule matches
+   *     2. minus  : rows where ANY exclude-rule matches
+   *     3. project: emit row[valueColumn]
+   *
+   * Use case is airline markets, but the shape is generic — any hierarchical
+   * picker over a flat reference table works (e.g. cabin tiers, fare families).
+   */
+  | {
+      kind: "markets-select";
+      referenceId: string;
+      /** Column whose values are returned (the resolved literal). Usually "code". */
+      valueColumn: string;
+      /** OR-joined inclusion rules. Empty array = include nothing. */
+      include: { column: string; value: string }[];
+      /** Subtractive rules — rows matching any of these are removed AFTER include. */
+      exclude: { column: string; value: string }[];
     };
 
 /**
