@@ -42,6 +42,13 @@ export type PathHint = {
   schemaTypes?: string[];
 };
 
+/** A fixed-choice option for an enum-port (e.g. merge mode = collect|sum|first|last). */
+export type NodeEnumOption = {
+  value: string;
+  label: string;
+  description?: string;
+};
+
 export type NodePort = {
   name: string;
   type: NodePortType;
@@ -49,6 +56,12 @@ export type NodePort = {
   description?: string;
   /** Optional hint to help the BindingsDesigner suggest paths from the rule's input schema. */
   hint?: PathHint;
+  /**
+   * When the port accepts only a fixed set of values, listing them here turns
+   * the literal editor into a friendly button group instead of free text.
+   * Only valid for string-typed params.
+   */
+  enum?: NodeEnumOption[];
 };
 
 export type NodeOutput = {

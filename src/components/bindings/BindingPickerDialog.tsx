@@ -401,6 +401,42 @@ function ContextPanel({ value, onChange }: { value: string; onChange: (key: stri
 }
 
 function LiteralPanel({ port, value, onChange, inputSchema }: { port: NodePort; value: unknown; onChange: (v: unknown) => void; inputSchema: JsonSchema }) {
+  // Enum port → button group
+  if (port.enum && port.enum.length > 0) {
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground/80 font-medium">
+          Choose one
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
+          {port.enum.map((opt) => {
+            const isActive = value === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => onChange(opt.value)}
+                className={cn(
+                  "text-left flex flex-col gap-0.5 px-3 py-2 rounded-md border transition-colors",
+                  isActive
+                    ? "bg-foreground text-background border-foreground"
+                    : "bg-card border-border hover:border-foreground/30",
+                )}
+              >
+                <span className="text-[12.5px] font-medium leading-tight">{opt.label}</span>
+                {opt.description ? (
+                  <span className={cn("text-[10.5px] leading-snug", isActive ? "opacity-80" : "text-muted-foreground")}>
+                    {opt.description}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   if (port.type === "object" || port.type === "any") {
     return (
       <div className="flex flex-col gap-2">
