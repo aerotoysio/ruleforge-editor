@@ -250,7 +250,10 @@ function GroupNode({
                 onRemoveExclude={onRemoveExclude}
               />
             )}
-            initiallyOpen={rootDefaultOpen && depth === 0}
+            // Default-expand the first two levels (continent + country) so the
+            // user lands on something useful — USA / United Kingdom / etc — without
+            // having to drill manually. Beyond that, branches stay collapsed.
+            initiallyOpen={(rootDefaultOpen && depth === 0) || depth < 1}
             forceOpen={!!filter}
           />
         );
