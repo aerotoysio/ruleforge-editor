@@ -27,7 +27,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      data-theme="dark"
+      data-theme="light"
       data-density="default"
       data-sidebar="full"
       className={`${geistSans.variable} ${geistMono.variable} h-full`}
