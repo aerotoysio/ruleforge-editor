@@ -2,7 +2,7 @@
 
 import "@xyflow/react/dist/style.css";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -10,6 +10,8 @@ import {
   Controls,
   MiniMap,
   useReactFlow,
+  useStore as useFlowStore,
+  useStoreApi as useFlowStoreApi,
   type Node as RFNode,
   type Edge as RFEdge,
   type NodeChange,
@@ -49,14 +51,76 @@ function CanvasInner() {
   const addInstance = useRuleStore((s) => s.addInstance);
   const nodeDefs = useNodesStore((s) => s.nodes);
   const rfInstance = useReactFlow();
+  const flowStoreApi = useFlowStoreApi();
+  // Subscribe to the React Flow store's `domNode` — it's set in Pane's useEffect
+  // and is what every handle-bounds scan actually requires (the action bails
+  // out early if `domNode?.querySelector('.xyflow__viewport')` is null).
+  const flowDomNode = useFlowStore((s) => s.domNode);
+
+  // CRITICAL: handle-bounds bootstrap.
+  //
+  // React Flow scans handle DOM positions on three paths:
+  //   1. Each NodeView calls `useUpdateNodeInternals(id)` in a useEffect
+  //   2. Each NodeWrapper attaches a ResizeObserver to its node element
+  //   3. updateNodeInternals dispatched directly via the store
+  //
+  // ALL three paths gate on `store.domNode` being set — the action's first
+  // line is `domNode?.querySelector('.xyflow__viewport')` and it returns
+  // immediately when that's null. `domNode` is set inside Pane's own useEffect.
+  //
+  // The race: NodeView's useEffect (deeper in the tree) fires FIRST in the
+  // post-order traversal, BEFORE Pane's useEffect runs and sets `domNode`.
+  // ResizeObserver's first callback also tends to fire before that. Both
+  // calls are silent no-ops, and ResizeObserver doesn't re-fire unless the
+  // element resizes. End result: every fresh page load opens with zero edges,
+  // because handleBounds never gets populated.
+  //
+  // Fix: subscribe to `store.domNode` here. The instant it flips from null
+  // to a real node, AND we have node DOM elements to work with, force a
+  // bulk updateInternals across every instance. We dispatch the store action
+  // SYNCHRONOUSLY (not via the `useUpdateNodeInternals` hook, which wraps in
+  // requestAnimationFrame and was racing with subsequent re-renders that
+  // overwrote the result). Idempotent and cheap.
+  useEffect(() => {
+    if (!flowDomNode || !rule || rule.instances.length === 0) return;
+    function rescan() {
+      type Update = { id: string; nodeElement: HTMLDivElement; force: true };
+      const updates = new Map<string, Update>();
+      for (const inst of rule!.instances) {
+        const el = flowDomNode!.querySelector<HTMLDivElement>(
+          `.react-flow__node[data-id="${inst.instanceId}"]`,
+        );
+        if (el) updates.set(inst.instanceId, { id: inst.instanceId, nodeElement: el, force: true });
+      }
+      if (updates.size === 0) return;
+      // Dispatch the store action SYNCHRONOUSLY — `useUpdateNodeInternals`
+      // wraps in requestAnimationFrame and races with the very re-render
+      // that just changed the handle layout, leaving handleBounds populated
+      // for the OLD layout (NV would scan with `sourceHandle: null` for a
+      // node that had since gained named pass/fail handles).
+      flowStoreApi.getState().updateNodeInternals(updates);
+    }
+    rescan();
+    // Re-scan after the next paint too — handles for nodes whose def loaded
+    // late (filter pass/fail) only mount on the SECOND render. Without this
+    // second pass, edges with sourceHandle="pass"/"fail" can't find their
+    // handle and silently disappear.
+    const raf = requestAnimationFrame(rescan);
+    return () => cancelAnimationFrame(raf);
+  }, [flowDomNode, rule?.id, rule?.instances, nodeDefs, flowStoreApi]);
 
   const rfNodes: RFNode[] = useMemo(
     () =>
       (rule?.instances ?? []).map((inst) => {
         const def = nodeDefs.find((n) => n.id === inst.nodeId);
         const isTerminal = def?.category === "input" || def?.category === "output";
-        const width = isTerminal ? 140 : 220;
-        const height = isTerminal ? 40 : 64;
+        // initialWidth/Height (NOT width/height) hint dimensions for the FIRST
+        // render so the node isn't visibility:hidden, but still lets React Flow's
+        // ResizeObserver replace them with actual measured DOM bounds — which
+        // is what triggers handle-bounds scanning. Setting `width`/`height`
+        // directly suppresses that and edges never compute endpoints.
+        const initialWidth = isTerminal ? 140 : 220;
+        const initialHeight = isTerminal ? 40 : 64;
         return {
           id: inst.instanceId,
           type: "ruleforgeNode",
@@ -64,9 +128,8 @@ function CanvasInner() {
           data: { instance: inst, def, bindings: rule?.bindings[inst.instanceId] },
           draggable: true,
           selected: selection.kind === "node" && selection.id === inst.instanceId,
-          width,
-          height,
-          measured: { width, height },
+          initialWidth,
+          initialHeight,
         };
       }),
     [rule?.instances, rule?.bindings, nodeDefs, selection],

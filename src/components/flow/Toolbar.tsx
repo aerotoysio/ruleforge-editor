@@ -81,42 +81,24 @@ export function Toolbar({ onTest, onOpenRuleSettings, onOpenAiDraft }: Props = {
   const { errors, warnings } = useMemo(() => groupIssues(issues), [issues]);
 
   // Stable refs so the keyboard handler (registered once) sees the latest values.
+  // CRITICAL: ALL hooks MUST be declared BEFORE any early return — otherwise the
+  // first render (rule still null) calls fewer hooks than later renders, which
+  // is a Rules-of-Hooks violation that crashes the whole subtree (Canvas → no
+  // edges visible). See https://react.dev/link/rules-of-hooks
   const saveRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const dirtyRef = useRef(dirty);
   const busyRef = useRef(busy);
-  useEffect(() => { dirtyRef.current = dirty; busyRef.current = busy; });
+  const errorsRef = useRef(errors);
+  const ruleRef = useRef(rule);
+  useEffect(() => {
+    dirtyRef.current = dirty;
+    busyRef.current = busy;
+    errorsRef.current = errors;
+    ruleRef.current = rule;
+  });
 
-  if (!rule) return null;
-
-  async function save(opts: { force?: boolean } = {}) {
-    if (errors.length > 0 && !opts.force) {
-      const ok = confirm(
-        `This rule has ${errors.length} validation error${errors.length === 1 ? "" : "s"}. ` +
-        `Save anyway? It'll be saved as draft — fix errors before publishing.`,
-      );
-      if (!ok) return;
-    }
-    setBusy(true);
-    try {
-      const res = await fetch(`/api/rules/${encodeURIComponent(rule!.id)}`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(rule),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        toast.error(data.error ?? "Save failed");
-        return;
-      }
-      toast.success(errors.length > 0 ? "Saved with validation errors" : "Rule saved");
-      markClean();
-    } finally {
-      setBusy(false);
-    }
-  }
-  saveRef.current = save;
-
-  // Cmd/Ctrl+S → save (no-op if not dirty or already busy)
+  // Cmd/Ctrl+S → save (no-op if not dirty or already busy). Registered once;
+  // refs above keep it pointing at the latest state.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "s") {
@@ -129,6 +111,39 @@ export function Toolbar({ onTest, onOpenRuleSettings, onOpenAiDraft }: Props = {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  if (!rule) return null;
+
+  async function save(opts: { force?: boolean } = {}) {
+    const errs = errorsRef.current;
+    const r = ruleRef.current;
+    if (!r) return;
+    if (errs.length > 0 && !opts.force) {
+      const ok = confirm(
+        `This rule has ${errs.length} validation error${errs.length === 1 ? "" : "s"}. ` +
+        `Save anyway? It'll be saved as draft — fix errors before publishing.`,
+      );
+      if (!ok) return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/rules/${encodeURIComponent(r.id)}`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(r),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error ?? "Save failed");
+        return;
+      }
+      toast.success(errs.length > 0 ? "Saved with validation errors" : "Rule saved");
+      markClean();
+    } finally {
+      setBusy(false);
+    }
+  }
+  saveRef.current = save;
 
   return (
     <header className="px-4 h-14 border-b bg-background shrink-0 flex items-center gap-3">
