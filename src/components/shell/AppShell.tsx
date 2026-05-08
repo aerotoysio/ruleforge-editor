@@ -15,9 +15,14 @@ export async function AppShell({ children }: { children: ReactNode }) {
         documentForgeUrl: settings.documentForgeUrl ?? null,
       }}
     >
-      <div className="flex h-screen w-screen overflow-hidden">
+      <div
+        className="app-shell"
+        style={{ background: "var(--bg)", color: "var(--text)" }}
+      >
         <Sidebar />
-        <main className="flex-1 flex flex-col overflow-hidden">{children}</main>
+        <main className="flex-1 flex flex-col overflow-hidden min-w-0">
+          {children}
+        </main>
       </div>
     </WorkspaceProvider>
   );
