@@ -11,6 +11,7 @@ import { useReferencesStore } from "@/lib/store/references-store";
 import { ShuttlePicker, type ShuttleItem } from "./ShuttlePicker";
 import { DateBindingPicker } from "./DateBindingPicker";
 import { MarketsPicker } from "./MarketsPicker";
+import { TemplateFillEditor } from "./TemplateFillEditor";
 import { walkSchema, type SchemaPathNode } from "@/lib/schema/path-walker";
 import { cn } from "@/lib/utils";
 import type { JsonSchema, NodePort, PortBinding } from "@/lib/types";
@@ -300,6 +301,22 @@ function PortEditor({
   onChange: (b: PortBinding | null) => void;
   inputSchema: JsonSchema;
 }) {
+  // Port supports template-fill (e.g. constant node's value port).
+  // Render a "From template" / "Free literal" toggle when both kinds are
+  // allowed, or go straight to the template-fill editor when it's the only
+  // option. The literal side falls through to the rest of this function.
+  const allowsTemplate = port.bindingKinds?.includes("template-fill") ?? false;
+  if (allowsTemplate) {
+    return (
+      <TemplatePortEditor
+        port={port}
+        binding={binding}
+        onChange={onChange}
+        inputSchema={inputSchema}
+      />
+    );
+  }
+
   // Enum string param → button group
   if (port.enum && port.enum.length > 0) {
     const value = binding?.kind === "literal" ? binding.value : undefined;
@@ -446,6 +463,107 @@ function PortEditor({
       onChange={(e) => onChange({ kind: "literal", value: e.target.value })}
       placeholder="value"
     />
+  );
+}
+
+// ------------------------------------------------------------------
+// Template-fill editor — toggle between picking a template and authoring
+// a free-form object literal. Pairs with `node-constant.value`.
+// ------------------------------------------------------------------
+
+function TemplatePortEditor({
+  port,
+  binding,
+  onChange,
+  inputSchema,
+}: {
+  port: NodePort;
+  binding: PortBinding | undefined;
+  onChange: (b: PortBinding | null) => void;
+  inputSchema: JsonSchema;
+}) {
+  const allowsLiteral = port.bindingKinds?.includes("literal") ?? false;
+  const showToggle = allowsLiteral; // template-fill is implied by being here
+  const isTemplate = binding?.kind === "template-fill" || (binding == null && !allowsLiteral);
+
+  function pickTemplateMode() {
+    if (binding?.kind !== "template-fill") {
+      onChange({ kind: "template-fill", templateId: "", fields: {} });
+    }
+  }
+  function pickLiteralMode() {
+    if (binding?.kind !== "literal") {
+      onChange({ kind: "literal", value: {} });
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {showToggle ? (
+        <div className="inline-flex rounded-md border bg-muted/40 p-0.5 self-start">
+          <button
+            type="button"
+            onClick={pickTemplateMode}
+            className={cn(
+              "px-3 h-7 text-[12px] font-medium rounded transition-colors",
+              isTemplate ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            From template
+          </button>
+          <button
+            type="button"
+            onClick={pickLiteralMode}
+            className={cn(
+              "px-3 h-7 text-[12px] font-medium rounded transition-colors",
+              !isTemplate ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+            )}
+          >
+            Free literal
+          </button>
+        </div>
+      ) : null}
+
+      {isTemplate ? (
+        <TemplateFillEditor
+          value={
+            binding?.kind === "template-fill"
+              ? binding
+              : { kind: "template-fill", templateId: "", fields: {} }
+          }
+          onChange={(b) => onChange(b)}
+          inputSchema={inputSchema}
+        />
+      ) : (
+        // Literal mode for object/any ports — let the user paste a JSON blob.
+        // Keep it simple here; ObjectShapeEditor (key/value with inline binding
+        // kind) is the bigger fallback if we want it later. For now a JSON
+        // textarea keeps the surface small.
+        <textarea
+          rows={6}
+          className="w-full text-[12px] font-mono px-2.5 py-1.5 rounded-md border border-border bg-background focus:outline-none focus:ring-2 focus:ring-foreground/30"
+          value={
+            binding?.kind === "literal"
+              ? typeof binding.value === "string"
+                ? binding.value
+                : JSON.stringify(binding.value, null, 2)
+              : ""
+          }
+          onChange={(e) => {
+            const txt = e.target.value;
+            // Try JSON first; fall back to a string literal so the user can
+            // type freely without parse errors blocking each keystroke.
+            try {
+              const parsed = JSON.parse(txt);
+              onChange({ kind: "literal", value: parsed });
+            } catch {
+              onChange({ kind: "literal", value: txt });
+            }
+          }}
+          placeholder='{ "type": "BAG", "amount": 50, … }'
+        />
+      )}
+    </div>
   );
 }
 

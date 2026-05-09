@@ -345,9 +345,14 @@ function describeBindings(bindings: NodeBindings | undefined, def: NodeDef | und
 
 function formatPortBinding(b: PortBinding): string {
   switch (b.kind) {
-    case "path":      return b.path;
-    case "literal":   return typeof b.value === "string" ? `"${b.value}"` : JSON.stringify(b.value);
-    case "reference": return `→ ${b.referenceId}`;
-    case "context":   return `$${b.key}`;
+    case "path":           return b.path;
+    case "literal":        return typeof b.value === "string" ? `"${b.value}"` : JSON.stringify(b.value);
+    case "reference":      return `→ ${b.referenceId}`;
+    case "context":        return `$${b.key}`;
+    case "ref-select":     return `${b.referenceId} · ${b.whereValues?.length ?? 0} picks`;
+    case "date":           return b.mode === "absolute" ? (b.date ?? "date") : `date:${b.mode}`;
+    case "count-of":       return `count(${b.arrayPath})`;
+    case "markets-select": return `${b.referenceId} (+${b.include.length}/-${b.exclude.length})`;
+    case "template-fill":  return b.templateId ? `${b.templateId} · ${Object.keys(b.fields).length} fields` : "(no template)";
   }
 }

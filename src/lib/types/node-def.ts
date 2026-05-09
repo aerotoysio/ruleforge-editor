@@ -218,6 +218,26 @@ export type PortBinding =
       include: { column: string; value: string }[];
       /** Subtractive rules — rows matching any of these are removed AFTER include. */
       exclude: { column: string; value: string }[];
+    }
+  /**
+   * Fill an output template field-by-field. Each template field gets its own
+   * sub-binding (literal, path, or context) so the user composes a structured
+   * object without retyping the shape. The engine resolves this to a regular
+   * object at evaluation time:
+   *
+   *     for each field in template:
+   *         out[field.name] = resolve(fields[field.name] ?? template.field.default)
+   *
+   * Pairs naturally with `node-constant`'s `value` port — the constant node
+   * becomes "emit a Bag-fee line with these values" instead of "emit this
+   * literal JSON blob".
+   */
+  | {
+      kind: "template-fill";
+      /** References OutputTemplate.id from the workspace's templates/ folder. */
+      templateId: string;
+      /** Per-field bindings, keyed by template-field name. Missing keys fall back to the template's `default` if present, else null. */
+      fields: Record<string, PortBinding>;
     };
 
 /**

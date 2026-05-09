@@ -12,7 +12,28 @@
  * deterministically.
  */
 
-import type { NodeDef, Rule } from "@/lib/types";
+import type { NodeDef, PortBinding, Rule } from "@/lib/types";
+
+/**
+ * A binding "exists" but might still be incomplete — e.g. a template-fill
+ * binding with no template picked, or a path binding with empty path. Treat
+ * those the same as missing for required-port validation, otherwise the
+ * Valid badge lies and rules fail at runtime.
+ */
+function isMeaningfulBinding(b: PortBinding | undefined): boolean {
+  if (!b) return false;
+  switch (b.kind) {
+    case "path":           return b.path.trim().length > 0;
+    case "literal":        return b.value !== undefined && b.value !== null && b.value !== "";
+    case "context":        return b.key.trim().length > 0;
+    case "reference":      return b.referenceId.trim().length > 0;
+    case "ref-select":     return b.referenceId.trim().length > 0;
+    case "markets-select": return b.referenceId.trim().length > 0 && (b.include.length > 0);
+    case "date":           return true; // any mode is meaningful
+    case "count-of":       return b.arrayPath.trim().length > 0;
+    case "template-fill":  return b.templateId.trim().length > 0;
+  }
+}
 
 export type ValidationIssue = {
   kind:
@@ -64,7 +85,8 @@ export function validateRule(rule: Rule, nodeDefs: NodeDef[]): ValidationIssue[]
     const bindings = rule.bindings[inst.instanceId]?.bindings ?? {};
     const allPorts = [...(def.ports.inputs ?? []), ...(def.ports.params ?? [])];
     for (const port of allPorts) {
-      if (port.required && !(port.name in bindings)) {
+      const b = bindings[port.name];
+      if (port.required && !isMeaningfulBinding(b)) {
         issues.push({
           kind: "unbound-required-port",
           severity: "error",
