@@ -121,6 +121,13 @@ export type RuleNodeInstance = {
   position: NodePosition;
   /** Optional per-instance display override. */
   label?: string;
+  /**
+   * Per-instance human-language description shown on the node card. Lets the
+   * author capture the *intent* of this specific use ("filter for AU market")
+   * so a third-party reading the canvas can scan the rule without opening
+   * each node. When set, takes precedence over the def's generic description.
+   */
+  description?: string;
 };
 
 /** Binds a single port to a path / literal / reference / context value. */

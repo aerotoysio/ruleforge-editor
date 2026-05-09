@@ -27,11 +27,19 @@ export type RuleState = {
   rule: Rule | null;
   dirty: boolean;
   selection: Selection;
+  /**
+   * Which node-instance the user has explicitly opened for editing.
+   * Decoupled from `selection` so a single click only selects (and lets
+   * the user drag the node) — the configure dialog opens only when an
+   * explicit "edit" gesture (cog icon, double-click, context menu) sets this.
+   */
+  editingInstanceId: string | null;
   trace: TraceHighlight | null;
 
   load: (rule: Rule) => void;
   setRule: (next: Rule) => void;
   patchRule: (patch: Partial<Rule>) => void;
+  requestEdit: (instanceId: string | null) => void;
 
   setInstances: (instances: RuleNodeInstance[]) => void;
   setEdges: (edges: RuleEdge[]) => void;
@@ -59,15 +67,17 @@ export const useRuleStore = create<RuleState>((set, get) => ({
   rule: null,
   dirty: false,
   selection: { kind: "none" },
+  editingInstanceId: null,
   trace: null,
 
-  load: (rule) => set({ rule, dirty: false, selection: { kind: "none" }, trace: null }),
+  load: (rule) => set({ rule, dirty: false, selection: { kind: "none" }, editingInstanceId: null, trace: null }),
   setRule: (next) => set({ rule: next, dirty: true }),
   patchRule: (patch) => {
     const { rule } = get();
     if (!rule) return;
     set({ rule: { ...rule, ...patch }, dirty: true });
   },
+  requestEdit: (instanceId) => set({ editingInstanceId: instanceId }),
 
   setInstances: (instances) => {
     const { rule } = get();
@@ -116,7 +126,7 @@ export const useRuleStore = create<RuleState>((set, get) => ({
     return id;
   },
   removeInstance: (instanceId) => {
-    const { rule, selection } = get();
+    const { rule, selection, editingInstanceId } = get();
     if (!rule) return;
     const instances = rule.instances.filter((n) => n.instanceId !== instanceId);
     const edges = rule.edges.filter((e) => e.source !== instanceId && e.target !== instanceId);
@@ -124,7 +134,8 @@ export const useRuleStore = create<RuleState>((set, get) => ({
     delete bindings[instanceId];
     const nextSel: Selection =
       selection.kind === "node" && selection.id === instanceId ? { kind: "none" } : selection;
-    set({ rule: { ...rule, instances, edges, bindings }, dirty: true, selection: nextSel });
+    const nextEditing = editingInstanceId === instanceId ? null : editingInstanceId;
+    set({ rule: { ...rule, instances, edges, bindings }, dirty: true, selection: nextSel, editingInstanceId: nextEditing });
   },
   removeEdge: (id) => {
     const { rule, selection } = get();

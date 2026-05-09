@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Handle, Position, useStoreApi, type NodeProps } from "@xyflow/react";
+import { Settings2, Trash2 } from "lucide-react";
 import type { RuleNodeInstance, NodeDef, NodeBindings, PortBinding } from "@/lib/types";
 import { useRuleStore } from "@/lib/store/rule-store";
 import { cn } from "@/lib/utils";
@@ -16,16 +17,25 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
   const { instance, def, bindings } = data;
   const trace = useRuleStore((s) => s.trace);
   const updateInstance = useRuleStore((s) => s.updateInstance);
+  const requestEdit = useRuleStore((s) => s.requestEdit);
+  const removeInstance = useRuleStore((s) => s.removeInstance);
   const outcome = trace?.nodeOutcomes[id];
 
   const category = def?.category ?? "filter";
   const isTerminal = category === "input" || category === "output";
   const showSourceHandle = category !== "output";
   const showTargetHandle = category !== "input";
+  // Categories that get the configure dialog (everything except terminals).
+  // Keep this in sync with UNIFIED_DIALOG_CATEGORIES in RuleEditorClient.
+  const isConfigurable = !isTerminal;
 
   const accent = def?.ui?.accent ?? "#64748b";
   const badge = def?.ui?.badge ?? "?";
   const label = instance.label ?? def?.name ?? instance.nodeId;
+  // Per-instance description takes precedence over the def's generic description.
+  // Only show it when the user has authored one — the def description is shown
+  // in the dialog header and palette, not on the canvas card (would be noisy).
+  const userDescription = instance.description?.trim();
 
   // When the node-def loads asynchronously and we suddenly grow extra handles
   // (per-branch pass/fail), React Flow needs to be told to re-scan the DOM —
@@ -136,10 +146,30 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
 
   const summary = describeBindings(bindings, def);
 
+  // Stop the click from also triggering React Flow's node-select handler when
+  // the user clicks the cog/trash icons — otherwise they'd both open the
+  // dialog AND deselect-then-reselect.
+  function onConfigureClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    requestEdit(id);
+  }
+  function onDeleteClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!confirm(`Delete "${label}" from this rule?`)) return;
+    removeInstance(id);
+  }
+  // Double-click on the body (not the label, not the input) opens the dialog.
+  // Quick way for power users to edit without aiming at the cog.
+  function onBodyDoubleClick(e: React.MouseEvent) {
+    if (editing) return;
+    e.stopPropagation();
+    if (isConfigurable) requestEdit(id);
+  }
+
   return (
     <div
       className={cn(
-        "relative min-w-[200px] max-w-[260px] rounded-md overflow-hidden bg-card transition-all",
+        "group/node relative min-w-[220px] max-w-[280px] rounded-md overflow-hidden bg-card transition-all",
         selected
           ? "ring-2 ring-foreground/80"
           : "border border-border hover:border-foreground/30",
@@ -150,6 +180,7 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
           ? "0 8px 16px -6px rgba(0,0,0,0.2)"
           : "0 1px 2px rgba(0,0,0,0.05)",
       }}
+      onDoubleClick={onBodyDoubleClick}
     >
       {/* Subtle 2px left accent stripe instead of a full coloured header */}
       <div
@@ -165,7 +196,40 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
         />
       ) : null}
 
-      <div className="px-3 py-2 pl-3.5">
+      {/* Hover toolbar — Configure / Delete icons. Hidden until hover/select
+          so the resting node card stays clean. `nodrag nopan` so React Flow
+          doesn't start a drag when the user reaches for an icon. */}
+      <div
+        className={cn(
+          "nodrag nopan absolute top-1.5 right-1.5 flex items-center gap-0.5 transition-opacity",
+          selected
+            ? "opacity-100"
+            : "opacity-0 group-hover/node:opacity-100 focus-within:opacity-100",
+        )}
+      >
+        {isConfigurable ? (
+          <button
+            type="button"
+            onClick={onConfigureClick}
+            className="w-6 h-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+            title="Configure (or double-click the card)"
+            aria-label="Configure node"
+          >
+            <Settings2 className="w-3.5 h-3.5" strokeWidth={1.8} />
+          </button>
+        ) : null}
+        <button
+          type="button"
+          onClick={onDeleteClick}
+          className="w-6 h-6 inline-flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+          title="Delete"
+          aria-label="Delete node"
+        >
+          <Trash2 className="w-3.5 h-3.5" strokeWidth={1.8} />
+        </button>
+      </div>
+
+      <div className="px-3 py-2.5 pl-3.5 pr-14">
         <div className="flex items-center gap-1.5 text-[9.5px] font-mono text-muted-foreground tracking-[0.08em] mb-0.5">
           <span className="font-semibold uppercase" style={{ color: accent }}>{badge}</span>
           <span className="opacity-70">{def?.category?.toUpperCase() ?? ""}</span>
@@ -181,18 +245,29 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
               if (e.key === "Escape") { e.preventDefault(); cancelEdit(); }
             }}
             onClick={(e) => e.stopPropagation()}
-            className="text-[13px] font-medium leading-tight text-foreground bg-background border border-foreground/40 rounded px-1 -mx-1 -my-0.5 w-[calc(100%+0.5rem)] focus:outline-none focus:ring-2 focus:ring-foreground/30"
+            onDoubleClick={(e) => e.stopPropagation()}
+            className="nodrag text-[13.5px] font-medium leading-tight text-foreground bg-background border border-foreground/40 rounded px-1 -mx-1 -my-0.5 w-[calc(100%+0.5rem)] focus:outline-none focus:ring-2 focus:ring-foreground/30"
           />
         ) : (
           <div
-            className="text-[13px] font-medium leading-tight text-foreground cursor-text"
+            className="text-[13.5px] font-medium leading-snug text-foreground cursor-text break-words"
             title="Double-click to rename"
-            onDoubleClick={startEdit}
+            onDoubleClick={(e) => { e.stopPropagation(); startEdit(e); }}
           >
             {label}
           </div>
         )}
-        {summary ? (
+        {/* Description (user-authored intent) takes the prominent slot below
+            the label. Falls back to a one-line bindings summary so blank
+            nodes still hint at what they're wired to. */}
+        {userDescription ? (
+          <div
+            className="mt-1 text-[11.5px] leading-snug text-muted-foreground italic line-clamp-2"
+            title={userDescription}
+          >
+            {userDescription}
+          </div>
+        ) : summary ? (
           <div className="mt-1 font-mono text-[10.5px] leading-snug truncate text-muted-foreground" title={summary}>
             {summary}
           </div>
