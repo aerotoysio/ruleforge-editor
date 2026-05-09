@@ -5,6 +5,7 @@ import { Handle, Position, useStoreApi, type NodeProps } from "@xyflow/react";
 import { Settings2, Trash2 } from "lucide-react";
 import type { RuleNodeInstance, NodeDef, NodeBindings, PortBinding } from "@/lib/types";
 import { useRuleStore } from "@/lib/store/rule-store";
+import { useTemplatesStore } from "@/lib/store/templates-store";
 import { cn } from "@/lib/utils";
 
 type NodeViewData = {
@@ -144,7 +145,11 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
     );
   }
 
-  const summary = describeBindings(bindings, def);
+  // Templates store powers the canvas-card summary for template-fill
+  // bindings — we want to show "Bag fee line · 3 fields" rather than the
+  // opaque "tmpl-bag-fee-line · 3 fields".
+  const templates = useTemplatesStore((s) => s.templates);
+  const summary = describeBindings(bindings, def, templates);
 
   // Stop the click from also triggering React Flow's node-select handler when
   // the user clicks the cog/trash icons — otherwise they'd both open the
@@ -331,19 +336,23 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
   );
 }
 
-function describeBindings(bindings: NodeBindings | undefined, def: NodeDef | undefined): string | null {
+function describeBindings(
+  bindings: NodeBindings | undefined,
+  def: NodeDef | undefined,
+  templates: { id: string; name: string }[] = [],
+): string | null {
   if (!bindings || !def) return null;
   const parts: string[] = [];
   for (const port of [...(def.ports.inputs ?? []), ...(def.ports.params ?? [])]) {
     const b = bindings.bindings[port.name];
     if (!b) continue;
-    parts.push(`${port.name}: ${formatPortBinding(b)}`);
+    parts.push(`${port.name}: ${formatPortBinding(b, templates)}`);
     if (parts.length >= 2) break;
   }
   return parts.length ? parts.join(" · ") : null;
 }
 
-function formatPortBinding(b: PortBinding): string {
+function formatPortBinding(b: PortBinding, templates: { id: string; name: string }[] = []): string {
   switch (b.kind) {
     case "path":           return b.path;
     case "literal":        return typeof b.value === "string" ? `"${b.value}"` : JSON.stringify(b.value);
@@ -353,6 +362,11 @@ function formatPortBinding(b: PortBinding): string {
     case "date":           return b.mode === "absolute" ? (b.date ?? "date") : `date:${b.mode}`;
     case "count-of":       return `count(${b.arrayPath})`;
     case "markets-select": return `${b.referenceId} (+${b.include.length}/-${b.exclude.length})`;
-    case "template-fill":  return b.templateId ? `${b.templateId} · ${Object.keys(b.fields).length} fields` : "(no template)";
+    case "template-fill": {
+      if (!b.templateId) return "(no template)";
+      const name = templates.find((t) => t.id === b.templateId)?.name ?? b.templateId;
+      const filled = Object.keys(b.fields).length;
+      return `${name} · ${filled} ${filled === 1 ? "field" : "fields"}`;
+    }
   }
 }
