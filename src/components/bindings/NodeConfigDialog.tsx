@@ -63,8 +63,11 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
 
   if (!rule || !instance || !def) return null;
 
-  // Categorise ports: required first, advanced (onMissing / arraySelector / etc.) collapsed
-  const ADVANCED_NAMES = new Set(["onMissing", "arraySelector", "caseInsensitive", "trim"]);
+  // Categorise ports: primary (visible by default) vs advanced (collapsed).
+  // arraySelector is a primary business choice ("any pax is gold" vs "every
+  // pax is gold" vs "no pax is gold") — not advanced. caseInsensitive / trim /
+  // onMissing are recovery / formatting toggles, hide them by default.
+  const ADVANCED_NAMES = new Set(["onMissing", "caseInsensitive", "trim"]);
   const allPorts = [...(def.ports.inputs ?? []), ...(def.ports.params ?? [])];
   const primary = allPorts.filter((p) => !ADVANCED_NAMES.has(p.name));
   const advanced = allPorts.filter((p) => ADVANCED_NAMES.has(p.name));
