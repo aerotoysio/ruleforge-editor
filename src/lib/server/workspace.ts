@@ -14,6 +14,8 @@ import type {
   JsonSchema,
   OutputTemplate,
   OutputTemplateSummary,
+  Asset,
+  AssetSummary,
 } from "@/lib/types";
 
 const SETTINGS_FILE = path.join(os.homedir(), ".ruleforge-editor.json");
@@ -65,7 +67,7 @@ export async function writeSettings(next: Partial<AppSettings>): Promise<AppSett
   return merged;
 }
 
-const DIRS = ["rules", "nodes", "samples", "refs", "templates"];
+const DIRS = ["rules", "nodes", "samples", "refs", "templates", "assets"];
 
 export async function seedWorkspace(rootPath: string, name?: string): Promise<WorkspaceConfig> {
   await fs.mkdir(rootPath, { recursive: true });
@@ -486,6 +488,90 @@ export async function writeTemplate(rootPath: string, tpl: OutputTemplate): Prom
 
 export async function deleteTemplate(rootPath: string, id: string): Promise<void> {
   const filePath = path.join(rootPath, "templates", `${safeName(id)}.json`);
+  await fs.unlink(filePath).catch(() => {});
+}
+
+// ----- Assets (template instances) --------------------------------------
+
+export async function listAssets(rootPath: string, templateId?: string): Promise<AssetSummary[]> {
+  const dir = path.join(rootPath, "assets");
+  try {
+    const files = (await fs.readdir(dir)).filter((f) => f.endsWith(".json"));
+    const out: AssetSummary[] = [];
+    for (const f of files) {
+      try {
+        const raw = await fs.readFile(path.join(dir, f), "utf-8");
+        const a = JSON.parse(raw) as Asset;
+        if (templateId && a.templateId !== templateId) continue;
+        out.push({
+          id: a.id,
+          templateId: a.templateId,
+          name: a.name,
+          description: a.description,
+          category: a.category,
+          updatedAt: a.updatedAt,
+        });
+      } catch {
+        // skip invalid
+      }
+    }
+    return out.sort((a, b) => {
+      // Sort by template, then category, then name
+      const t = a.templateId.localeCompare(b.templateId);
+      if (t !== 0) return t;
+      const c = (a.category ?? "").localeCompare(b.category ?? "");
+      if (c !== 0) return c;
+      return (a.name ?? a.id).localeCompare(b.name ?? b.id);
+    });
+  } catch {
+    return [];
+  }
+}
+
+export async function listAssetsFull(rootPath: string, templateId?: string): Promise<Asset[]> {
+  const dir = path.join(rootPath, "assets");
+  try {
+    const files = (await fs.readdir(dir)).filter((f) => f.endsWith(".json"));
+    const out: Asset[] = [];
+    for (const f of files) {
+      try {
+        const raw = await fs.readFile(path.join(dir, f), "utf-8");
+        const a = JSON.parse(raw) as Asset;
+        if (templateId && a.templateId !== templateId) continue;
+        out.push(a);
+      } catch {
+        // skip
+      }
+    }
+    return out.sort((a, b) => (a.name ?? a.id).localeCompare(b.name ?? b.id));
+  } catch {
+    return [];
+  }
+}
+
+export async function readAsset(rootPath: string, id: string): Promise<Asset | null> {
+  const filePath = path.join(rootPath, "assets", `${safeName(id)}.json`);
+  try {
+    const raw = await fs.readFile(filePath, "utf-8");
+    return JSON.parse(raw) as Asset;
+  } catch {
+    return null;
+  }
+}
+
+export async function writeAsset(rootPath: string, asset: Asset): Promise<void> {
+  const dir = path.join(rootPath, "assets");
+  await fs.mkdir(dir, { recursive: true });
+  const next: Asset = { ...asset, updatedAt: new Date().toISOString() };
+  await fs.writeFile(
+    path.join(dir, `${safeName(asset.id)}.json`),
+    JSON.stringify(next, null, 2),
+    "utf-8",
+  );
+}
+
+export async function deleteAsset(rootPath: string, id: string): Promise<void> {
+  const filePath = path.join(rootPath, "assets", `${safeName(id)}.json`);
   await fs.unlink(filePath).catch(() => {});
 }
 
