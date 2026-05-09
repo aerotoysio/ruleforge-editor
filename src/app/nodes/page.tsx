@@ -7,26 +7,33 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/EmptyState";
 import type { NodeCategory } from "@/lib/types";
 
-// Engine team note: these categories are declared but throw NotSupportedException
-// at evaluation time. We let users author against them, but flag them in the UI
-// so business users know they won't actually run yet.
-const UNSUPPORTED_CATEGORIES: NodeCategory[] = ["api", "sql", "product", "reference"];
+// Engine support status — tracks which categories are wired up in the
+// engine's evaluator. As of ENGINE_CAPABILITIES.md (post-production-grade
+// bundle) all 20 categories ship with an evaluator. Keep this as an empty
+// list until the engine deprecates something.
+const UNSUPPORTED_CATEGORIES: NodeCategory[] = [];
 
 const GROUP_LABEL: Record<string, string> = {
   input: "Terminals",
   output: "Terminals",
-  iterator: "Control flow",
-  merge: "Control flow",
-  filter: "Filters",
-  mutator: "Mutators",
+  constant: "Data flow",
+  product: "Data flow",
+  mutator: "Data flow",
+  filter: "Decision",
+  logic: "Decision",
+  switch: "Decision",
+  assert: "Decision",
+  bucket: "Decision",
   calc: "Compute",
-  constant: "Compute",
+  reference: "Compute",
+  api: "Compute",
+  iterator: "Iteration",
+  merge: "Iteration",
+  sort: "Array transform",
+  limit: "Array transform",
+  distinct: "Array transform",
+  groupBy: "Array transform",
   ruleRef: "Composition",
-  logic: "Logic",
-  product: "Output",
-  reference: "Reference",
-  sql: "External",
-  api: "External",
 };
 
 export default async function NodesPage() {
