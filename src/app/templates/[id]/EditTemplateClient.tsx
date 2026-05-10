@@ -7,7 +7,7 @@ import { ArrowLeft, Save, Trash2, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import type { OutputTemplate, OutputTemplateField, OutputTemplateFieldType } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Button } from "@/components/ui/button";
+
 import { Input } from "@/components/ui/Input";
 
 const TYPES: OutputTemplateFieldType[] = [
@@ -105,12 +105,12 @@ export function EditTemplateClient({ initial }: { initial: OutputTemplate }) {
         }
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={remove} disabled={busy} className="text-destructive hover:text-destructive">
+            <button className="btn ghost sm danger" onClick={remove} disabled={busy}>
               <Trash2 className="w-3.5 h-3.5" /> Delete
-            </Button>
-            <Button variant="default" size="sm" onClick={save} disabled={busy || !dirty}>
+            </button>
+            <button className="btn primary sm" onClick={save} disabled={busy || !dirty}>
               <Save className="w-3.5 h-3.5" /> {dirty ? "Save" : "Saved"}
-            </Button>
+            </button>
           </div>
         }
       />
@@ -154,9 +154,9 @@ export function EditTemplateClient({ initial }: { initial: OutputTemplate }) {
               <h2 className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground/80 font-semibold">
                 Fields
               </h2>
-              <Button variant="ghost" size="sm" onClick={addField}>
+              <button className="btn ghost sm" onClick={addField}>
                 <Plus className="w-3.5 h-3.5" /> Add field
-              </Button>
+              </button>
             </div>
             <div className="flex flex-col gap-1.5">
               {tpl.fields.length === 0 ? (

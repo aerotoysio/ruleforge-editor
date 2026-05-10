@@ -148,7 +148,7 @@ function FieldRow({
             {field.name}
           </span>
           {field.required ? (
-            <span className="text-[9px] uppercase tracking-wider px-1 h-3.5 inline-flex items-center rounded bg-red-50 text-red-700 border border-red-200 font-medium dark:bg-red-950/30 dark:text-red-300 dark:border-red-900">
+            <span className="req-pill">
               req
             </span>
           ) : null}

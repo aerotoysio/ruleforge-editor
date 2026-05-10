@@ -7,7 +7,7 @@ import { Save, ArrowLeft, LayoutTemplate } from "lucide-react";
 import { toast } from "sonner";
 import type { Asset, OutputTemplate } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Button } from "@/components/ui/button";
+
 import { Input } from "@/components/ui/Input";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { slugify } from "@/lib/slug";
@@ -92,7 +92,7 @@ export function NewAssetClient({ templates }: { templates: OutputTemplate[] }) {
             description="An asset is a concrete instance of a template — so we need a template to instance from. Create one first, then come back here."
             action={
               <Link href="/templates/new">
-                <Button variant="default"><LayoutTemplate className="w-3.5 h-3.5" /> New template</Button>
+                <button className="btn primary"><LayoutTemplate className="w-3.5 h-3.5" /> New template</button>
               </Link>
             }
           />
@@ -112,9 +112,9 @@ export function NewAssetClient({ templates }: { templates: OutputTemplate[] }) {
           </Link>
         }
         actions={
-          <Button variant="default" size="sm" onClick={save} disabled={busy || !name.trim() || !templateId}>
+          <button className="btn primary sm" onClick={save} disabled={busy || !name.trim() || !templateId}>
             <Save className="w-3.5 h-3.5" /> Create asset
-          </Button>
+          </button>
         }
       />
       <div className="flex-1 overflow-auto px-8 py-6 bg-muted/30">

@@ -7,7 +7,6 @@ import { ArrowLeft, Save, Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import type { Asset, OutputTemplate, OutputTemplateField } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/Input";
 
 type Props = {
@@ -84,12 +83,12 @@ export function EditAssetClient({ initialAsset, templates }: Props) {
         }
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={remove} disabled={busy} className="text-destructive hover:text-destructive">
+            <button className="btn ghost sm danger" onClick={remove} disabled={busy}>
               <Trash2 className="w-3.5 h-3.5" /> Delete
-            </Button>
-            <Button variant="default" size="sm" onClick={save} disabled={busy || !dirty}>
+            </button>
+            <button className="btn primary sm" onClick={save} disabled={busy || !dirty}>
               <Save className="w-3.5 h-3.5" /> {dirty ? "Save" : "Saved"}
-            </Button>
+            </button>
           </div>
         }
       />
@@ -202,7 +201,7 @@ function FieldRow({
             {field.name}
           </span>
           {field.required ? (
-            <span className="text-[9px] uppercase tracking-wider px-1 h-3.5 inline-flex items-center rounded bg-red-50 text-red-700 border border-red-200 font-medium dark:bg-red-950/30 dark:text-red-300 dark:border-red-900">
+            <span className="req-pill">
               req
             </span>
           ) : null}

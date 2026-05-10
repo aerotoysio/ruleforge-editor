@@ -382,6 +382,36 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
 .status-badge.published { background: var(--success-soft); color: var(--success); border-color: transparent; }
 .status-badge.published .dot { background: var(--success); }
 
+/* Card hover affordance — used in node library cards. CSS-only so it works
+ * inside server components (where onMouseEnter handlers are illegal). */
+.card-hover {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.card-hover:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+}
+
+/* Tiny "required" pill — used inline next to required field names. */
+.req-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 14px;
+  padding: 0 5px;
+  border-radius: 3px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1;
+  border: 1px solid transparent;
+}
+
 /* ============================================================================
  * Page chrome — `.page`, `.page-head`, `.crumb`, `.topbar`
  * ============================================================================ */
