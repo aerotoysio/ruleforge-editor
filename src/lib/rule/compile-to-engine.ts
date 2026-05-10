@@ -216,9 +216,22 @@ function compileInstance(
       };
       break;
     case "constant":
-    case "product":
+    case "product": {
+      // Engine subtlety: `constant` returns its `value` raw — no placeholder
+      // substitution. `product` runs `ResolveCtxPlaceholders` over `output`.
+      // If the user authored a `template-fill` or `path` binding (both of
+      // which produce `${...}` placeholders), we MUST emit engine category
+      // `product` so the substitution actually fires. A pure-literal value
+      // (no placeholders) stays as `constant`.
+      const valueBinding = portBindings.value ?? portBindings.literal;
+      const needsSubstitution =
+        valueBinding?.kind === "template-fill" || valueBinding?.kind === "path";
       data.config = compileShapeConfig(inst, def, portBindings, ctx);
+      if (needsSubstitution) {
+        data.category = "product";
+      }
       break;
+    }
     case "logic":
       // No config record — engine parses the op (and/or/xor/not) from
       // `templateId` and `label`. Both already populated above.
@@ -467,12 +480,21 @@ function compileShapeConfig(
   bindings: Record<string, PortBinding>,
   ctx: CompileContext,
 ): unknown {
-  // Shape-emitting nodes (constant, product) accept either a literal value
-  // or a template-fill that we flatten into a literal with `${...}` placeholders.
+  // Shape-emitting nodes (constant, product). The compileInstance caller
+  // overrides `data.category` to "product" when the binding is template-fill
+  // or path, since the engine `constant` evaluator returns its value RAW
+  // (no placeholder substitution); only `product` runs ResolveCtxPlaceholders.
+  // Match that here: emit `{ output: ... }` for substitution-shaped configs,
+  // `{ value: ... }` only for plain literals that won't be substituted.
   const value = bindings.value ?? bindings.literal;
   if (!value) return def.category === "product" ? { output: {} } : { value: null };
 
   if (value.kind === "literal") {
+    // Plain literal — engine doesn't substitute `$.foo` strings inside
+    // constant.value, so what's authored is what's emitted. If the user
+    // wrote `"$.booking.bookingRef"` expecting substitution, that's an
+    // authoring bug — they need template-fill or `${...}` syntax inside
+    // a product. (Validation flags this; see isMeaningfulBinding fixups.)
     return def.category === "product" ? { output: value.value } : { value: value.value };
   }
   if (value.kind === "template-fill") {
@@ -493,11 +515,15 @@ function compileShapeConfig(
       }
       obj[field.name] = bindingToPlaceholderValue(fb);
     }
-    return def.category === "product" ? { output: obj } : { value: obj };
+    // ALWAYS emit as `output` — the placeholder syntax we just generated
+    // requires the engine's product evaluator to substitute. compileInstance
+    // overrides data.category to "product" for this case.
+    return { output: obj };
   }
   if (value.kind === "path") {
-    // Whole-shape path binding — engine resolves at eval time.
-    return def.category === "product" ? { output: `\${${value.path}}` } : { value: `\${${value.path}}` };
+    // Whole-shape path binding — engine resolves at eval time. Same product
+    // override as template-fill above.
+    return { output: `\${${value.path}}` };
   }
   // Other binding kinds aren't supported on shape ports today.
   throw new CompileError(
