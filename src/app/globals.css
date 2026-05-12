@@ -382,6 +382,98 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
 .status-badge.published { background: var(--success-soft); color: var(--success); border-color: transparent; }
 .status-badge.published .dot { background: var(--success); }
 
+/* ============================================================================
+ * Topbar — global header that sits between Sidebar and the page content.
+ * Carries breadcrumbs (left) + search (right) + env pill. Hand-rolled to
+ * exactly match the design.
+ * ============================================================================ */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  height: 52px;
+  border-bottom: 1px solid var(--border);
+  padding: 0 18px;
+  gap: 14px;
+  background: var(--panel);
+  flex-shrink: 0;
+}
+
+.crumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+.crumb .sep { color: var(--text-faint); }
+.crumb .here { color: var(--text); font-weight: 500; }
+.crumb a:hover { color: var(--text); }
+
+.topbar-search {
+  margin-left: auto;
+  width: 320px;
+  position: relative;
+}
+.topbar-search input {
+  width: 100%;
+  height: 32px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0 36px 0 32px;
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+}
+.topbar-search input::placeholder { color: var(--text-faint); }
+.topbar-search input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.topbar-search > svg {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+}
+.topbar-search .kbd {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+}
+
+.env-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 8px 3px 7px;
+  background: var(--panel-2);
+}
+.env-pill .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 0 3px var(--success-soft);
+}
+
 /* Card hover affordance — used in node library cards. CSS-only so it works
  * inside server components (where onMouseEnter handlers are illegal). */
 .card-hover {
@@ -700,6 +792,110 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
 /* small text utility */
 .hint { color: var(--text-muted); font-size: 12px; }
 .muted { color: var(--text-muted); }
+
+/* ============================================================================
+ * Settings — left rail of groups + right pane of grouped tables
+ * ============================================================================ */
+
+.settings-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+.settings-nav {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  position: sticky;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 0 8px;
+  overflow: hidden;
+}
+.settings-nav-item {
+  padding: 8px 14px;
+  text-align: left;
+  border-left: 2px solid transparent;
+  color: var(--text);
+  background: transparent;
+  cursor: pointer;
+  width: 100%;
+  font: inherit;
+}
+.settings-nav-item:hover { background: var(--panel-2); }
+.settings-nav-item.on {
+  background: var(--accent-soft);
+  border-left-color: var(--accent);
+}
+.settings-nav-item.on > div:first-child { color: var(--accent); }
+
+.settings-main {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+.settings-group {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.settings-group-head {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
+}
+.settings-group-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  color: var(--text);
+}
+.settings-group-head p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.settings-table { display: flex; flex-direction: column; }
+.settings-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.5fr);
+  gap: 16px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+}
+.settings-row:last-child { border-bottom: 0; }
+.settings-row-head {
+  background: var(--panel-2);
+  padding: 8px 20px;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 500;
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.5fr);
+  gap: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.settings-name {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--text);
+}
+.settings-desc {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  line-height: 1.45;
+}
+.settings-ctl { min-width: 0; }
 
 /* ============================================================================
  * Test runner — `.test-panel`, `.test-body`, `.test-pane`, `.pane-head`,

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Sidebar } from "./Sidebar";
+import { Topbar } from "./Topbar";
 import { WorkspaceProvider } from "./WorkspaceProvider";
 import { getActiveRoot, readSettings } from "@/lib/server/workspace";
 
@@ -21,7 +22,10 @@ export async function AppShell({ children }: { children: ReactNode }) {
       >
         <Sidebar />
         <main className="flex-1 flex flex-col overflow-hidden min-w-0">
-          {children}
+          <Topbar />
+          <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+            {children}
+          </div>
         </main>
       </div>
     </WorkspaceProvider>

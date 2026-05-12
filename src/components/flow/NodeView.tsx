@@ -106,47 +106,77 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
     : "";
 
   if (isTerminal) {
-    // Terminals are subtle pill chips with a coloured dot — much quieter
-    // than the previous fully-coloured pills, while keeping the pill shape
-    // as the visual cue that this is a start/end of the graph.
+    // Terminals are pill chips with a coloured badge dot — the design's
+    // node header miniaturised into a single horizontal pill.
     return (
       <div
-        className={cn(
-          "relative flex items-center justify-center gap-2 transition-all border bg-card",
-          outcomeStyle,
-          selected ? "ring-2 ring-foreground ring-offset-2 ring-offset-background" : "",
-        )}
+        className={cn("relative flex items-center justify-center gap-2 transition-all", outcomeStyle)}
         style={{
+          background: "var(--panel)",
+          border: `1px solid ${selected ? "var(--accent)" : "var(--border-strong)"}`,
           borderRadius: 999,
-          borderColor: selected ? "var(--foreground)" : "var(--border)",
           width: 140,
-          height: 40,
-          paddingLeft: 12,
-          paddingRight: 12,
+          height: 38,
+          padding: "0 14px",
           boxShadow: selected
-            ? "0 4px 12px -2px rgba(0,0,0,0.18)"
-            : "0 1px 2px rgba(0,0,0,0.06)",
+            ? "0 0 0 3px var(--accent-soft), var(--shadow-md)"
+            : "var(--shadow-sm)",
+          userSelect: "none",
+          cursor: "grab",
         }}
       >
         {showTargetHandle ? (
           <Handle
             type="target"
             position={Position.Left}
-            style={{ background: "var(--background)", width: 10, height: 10, border: `2px solid ${accent}` }}
+            style={{
+              background: "var(--panel)",
+              width: 10,
+              height: 10,
+              border: `2px solid ${selected ? "var(--accent)" : "var(--border-strong)"}`,
+              left: -6,
+            }}
           />
         ) : null}
         <span
-          className="w-2 h-2 rounded-full shrink-0"
-          style={{ background: accent }}
-          aria-hidden
-        />
-        <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">{badge}</span>
-        <span className="text-[13px] font-medium text-foreground truncate">{label}</span>
+          className="inline-flex items-center justify-center mono"
+          style={{
+            width: 18,
+            height: 18,
+            borderRadius: 4,
+            background: hexToRgba(accent, 0.18),
+            color: accent,
+            fontSize: 9,
+            fontWeight: 700,
+            letterSpacing: "0.04em",
+            flexShrink: 0,
+          }}
+        >
+          {badge}
+        </span>
+        <span
+          style={{
+            fontSize: 13,
+            fontWeight: 500,
+            color: "var(--text)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {label}
+        </span>
         {showSourceHandle ? (
           <Handle
             type="source"
             position={Position.Right}
-            style={{ background: "var(--background)", width: 10, height: 10, border: `2px solid ${accent}` }}
+            style={{
+              background: "var(--panel)",
+              width: 10,
+              height: 10,
+              border: `2px solid ${selected ? "var(--accent)" : "var(--border-strong)"}`,
+              right: -6,
+            }}
           />
         ) : null}
       </div>
@@ -178,31 +208,33 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
 
   return (
     <div
-      className={cn(
-        "group/node relative min-w-[220px] max-w-[280px] rounded-md overflow-hidden bg-card transition-all",
-        selected
-          ? "ring-2 ring-foreground/80"
-          : "border border-border hover:border-foreground/30",
-        outcomeStyle,
-      )}
+      className={cn("group/node relative overflow-hidden", outcomeStyle)}
       style={{
+        width: 220,
+        background: "var(--panel)",
+        border: `1px solid ${selected ? "var(--accent)" : "var(--border-strong)"}`,
+        borderRadius: 10,
         boxShadow: selected
-          ? "0 8px 16px -6px rgba(0,0,0,0.2)"
-          : "0 1px 2px rgba(0,0,0,0.05)",
+          ? "0 0 0 3px var(--accent-soft), var(--shadow-md)"
+          : "var(--shadow-sm)",
+        fontSize: 12,
+        userSelect: "none",
+        cursor: "grab",
+        transition: "border-color 0.12s, box-shadow 0.12s",
       }}
       onDoubleClick={onBodyDoubleClick}
     >
-      {/* Subtle 2px left accent stripe instead of a full coloured header */}
-      <div
-        className="absolute left-0 top-0 bottom-0 w-[3px]"
-        style={{ background: accent }}
-      />
-
       {showTargetHandle ? (
         <Handle
           type="target"
           position={Position.Left}
-          style={{ background: "var(--muted-foreground)", width: 8, height: 8, border: "2px solid var(--background)" }}
+          style={{
+            background: "var(--panel)",
+            width: 10,
+            height: 10,
+            border: `2px solid ${selected ? "var(--accent)" : "var(--border-strong)"}`,
+            left: -6,
+          }}
         />
       ) : null}
 
@@ -239,11 +271,52 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
         </button>
       </div>
 
-      <div className="px-3 py-2.5 pl-3.5 pr-14">
-        <div className="flex items-center gap-1.5 text-[9.5px] font-mono text-muted-foreground tracking-[0.08em] mb-0.5">
-          <span className="font-semibold uppercase" style={{ color: accent }}>{badge}</span>
-          <span className="opacity-70">{def?.category?.toUpperCase() ?? ""}</span>
-        </div>
+      {/* Header (`.nh`) — small badge + category label on a panel-2 strip */}
+      <div
+        className="flex items-center gap-2"
+        style={{
+          padding: "7px 10px",
+          background: "var(--panel-2)",
+          borderBottom: "1px solid var(--border)",
+          borderRadius: "9px 9px 0 0",
+        }}
+      >
+        <span
+          className="inline-flex items-center justify-center mono"
+          style={{
+            width: 18,
+            height: 18,
+            borderRadius: 4,
+            background: hexToRgba(accent, 0.18),
+            color: accent,
+            fontSize: 9.5,
+            fontWeight: 700,
+            letterSpacing: "0.04em",
+            flexShrink: 0,
+          }}
+        >
+          {badge}
+        </span>
+        <span
+          className="mono"
+          style={{
+            fontSize: 10,
+            textTransform: "uppercase",
+            letterSpacing: "0.05em",
+            color: "var(--text-muted)",
+            fontWeight: 500,
+            flex: 1,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {def?.category ?? ""}
+        </span>
+      </div>
+
+      {/* Body (`.nb`) — title + (description OR binding summary) */}
+      <div style={{ padding: 10, paddingRight: 38 }}>
         {editing ? (
           <input
             ref={inputRef}
@@ -256,29 +329,62 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
             }}
             onClick={(e) => e.stopPropagation()}
             onDoubleClick={(e) => e.stopPropagation()}
-            className="nodrag text-[13.5px] font-medium leading-tight text-foreground bg-background border border-foreground/40 rounded px-1 -mx-1 -my-0.5 w-[calc(100%+0.5rem)] focus:outline-none focus:ring-2 focus:ring-foreground/30"
+            className="nodrag"
+            style={{
+              fontSize: 13,
+              fontWeight: 500,
+              letterSpacing: "-0.01em",
+              color: "var(--text)",
+              background: "var(--bg)",
+              border: "1px solid var(--accent)",
+              borderRadius: 4,
+              padding: "1px 4px",
+              width: "100%",
+              outline: "none",
+              boxShadow: "0 0 0 3px var(--accent-soft)",
+            }}
           />
         ) : (
           <div
-            className="text-[13.5px] font-medium leading-snug text-foreground cursor-text break-words"
+            style={{
+              fontSize: 13,
+              fontWeight: 500,
+              letterSpacing: "-0.01em",
+              color: "var(--text)",
+              cursor: "text",
+              lineHeight: 1.3,
+              wordBreak: "break-word",
+              marginBottom: userDescription || summary ? 4 : 0,
+            }}
             title="Double-click to rename"
             onDoubleClick={(e) => { e.stopPropagation(); startEdit(e); }}
           >
             {label}
           </div>
         )}
-        {/* Description (user-authored intent) takes the prominent slot below
-            the label. Falls back to a one-line bindings summary so blank
-            nodes still hint at what they're wired to. */}
         {userDescription ? (
           <div
-            className="mt-1 text-[11.5px] leading-snug text-muted-foreground italic line-clamp-2"
+            className="line-clamp-2"
+            style={{
+              fontSize: 11.5,
+              color: "var(--text-muted)",
+              fontStyle: "italic",
+              lineHeight: 1.4,
+            }}
             title={userDescription}
           >
             {userDescription}
           </div>
         ) : summary ? (
-          <div className="mt-1 font-mono text-[10.5px] leading-snug truncate text-muted-foreground" title={summary}>
+          <div
+            className="mono truncate"
+            style={{
+              fontSize: 10.5,
+              color: "var(--text-muted)",
+              lineHeight: 1.4,
+            }}
+            title={summary}
+          >
             {summary}
           </div>
         ) : null}
@@ -309,10 +415,11 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
                         position={Position.Right}
                         style={{
                           top,
-                          background: colour,
+                          background: "var(--panel)",
                           width: 10,
                           height: 10,
-                          border: "2px solid var(--background)",
+                          border: `2px solid ${colour}`,
+                          right: -6,
                         }}
                       />
                       <span
@@ -327,12 +434,18 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
               </>
             );
           }
-          // Single default output — one centred handle, unchanged
+          // Single default output — one centred handle
           return (
             <Handle
               type="source"
               position={Position.Right}
-              style={{ background: "var(--muted-foreground)", width: 8, height: 8, border: "2px solid var(--background)" }}
+              style={{
+                background: "var(--panel)",
+                width: 10,
+                height: 10,
+                border: `2px solid ${selected ? "var(--accent)" : "var(--border-strong)"}`,
+                right: -6,
+              }}
             />
           );
         })()
@@ -374,4 +487,23 @@ function formatPortBinding(b: PortBinding, templates: { id: string; name: string
       return `${name} · ${filled} ${filled === 1 ? "field" : "fields"}`;
     }
   }
+}
+
+/**
+ * Soften a CSS color into an `rgba` with the given alpha — used to tint the
+ * node header's badge background while keeping its foreground full-strength.
+ * Accepts hex (#abc / #aabbcc) and falls back to a generic translucent grey
+ * for non-hex inputs (CSS vars, oklch() strings) so we don't break rendering.
+ */
+function hexToRgba(color: string, alpha: number): string {
+  if (!color?.startsWith("#")) return `rgba(120, 120, 120, ${alpha})`;
+  let hex = color.slice(1);
+  if (hex.length === 3) {
+    hex = hex.split("").map((c) => c + c).join("");
+  }
+  if (hex.length !== 6) return `rgba(120, 120, 120, ${alpha})`;
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
