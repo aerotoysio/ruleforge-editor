@@ -9,7 +9,6 @@ import { useRuleStore } from "@/lib/store/rule-store";
 import { useNodesStore } from "@/lib/store/nodes-store";
 import { validateRule, groupIssues, type ValidationIssue } from "@/lib/rule/validate";
 import { autoLayout } from "@/lib/flow/auto-layout";
-import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { cn } from "@/lib/utils";
 
@@ -146,25 +145,60 @@ export function Toolbar({ onTest, onOpenRuleSettings, onOpenAiDraft }: Props = {
   saveRef.current = save;
 
   return (
-    <header className="px-4 h-14 border-b bg-background shrink-0 flex items-center gap-3">
+    <header
+      className="flex items-center gap-3 px-4 shrink-0"
+      style={{
+        height: 52,
+        background: "var(--panel)",
+        borderBottom: "1px solid var(--border)",
+      }}
+    >
       <Link
         href="/rules"
-        className="inline-flex items-center gap-1 text-[12px] px-2 py-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+        className="inline-flex items-center gap-1 px-2 py-1 rounded-md transition-colors"
+        style={{ fontSize: 12, color: "var(--text-muted)" }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = "var(--panel-2)";
+          e.currentTarget.style.color = "var(--text)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = "transparent";
+          e.currentTarget.style.color = "var(--text-muted)";
+        }}
       >
         <ArrowLeft className="w-3.5 h-3.5" /> Rules
       </Link>
-      <div className="h-5 w-px bg-border shrink-0" />
+      <div className="h-5 w-px shrink-0" style={{ background: "var(--border)" }} />
       <div className="flex items-center gap-2.5 min-w-0">
-        <span className="text-[14px] font-semibold tracking-tight text-foreground truncate" title={rule.name}>{rule.name}</span>
-        <span className="font-mono text-[11px] text-muted-foreground truncate" title={rule.id}>{rule.id}</span>
+        <span
+          className="text-[14px] font-semibold tracking-tight truncate"
+          style={{ color: "var(--text)" }}
+          title={rule.name}
+        >
+          {rule.name}
+        </span>
+        <span
+          className="mono text-[11px] truncate"
+          style={{ color: "var(--text-muted)" }}
+          title={rule.id}
+        >
+          {rule.id}
+        </span>
         <StatusBadge status={rule.status} />
-        <span className="font-mono text-[10.5px] text-muted-foreground/80 px-1.5 py-0.5 rounded bg-muted/50">v{rule.currentVersion}</span>
+        <span
+          className="mono text-[10.5px] px-1.5 py-0.5 rounded"
+          style={{
+            color: "var(--text-muted)",
+            background: "var(--panel-2)",
+          }}
+        >
+          v{rule.currentVersion}
+        </span>
       </div>
 
       <div className="ml-auto flex items-center gap-1.5">
-        <Button
-          variant="ghost"
-          size="sm"
+        <button
+          className="btn ghost sm"
           onClick={() => {
             if (!rule || rule.instances.length === 0) return;
             const positions = autoLayout(
@@ -181,19 +215,32 @@ export function Toolbar({ onTest, onOpenRuleSettings, onOpenAiDraft }: Props = {
           title="Re-arrange nodes left-to-right by graph order"
         >
           <LayoutGrid className="w-3.5 h-3.5" /> Layout
-        </Button>
-        <Button variant="ghost" size="sm" onClick={duplicate} disabled={busy} title="Make a copy of this rule under a new id">
+        </button>
+        <button
+          className="btn ghost sm"
+          onClick={duplicate}
+          disabled={busy}
+          title="Make a copy of this rule under a new id"
+        >
           <Copy className="w-3.5 h-3.5" /> Duplicate
-        </Button>
-        <Button variant="ghost" size="sm" onClick={() => onOpenAiDraft?.()} title="Draft from prompt via local Ollama">
+        </button>
+        <button
+          className="btn ghost sm"
+          onClick={() => onOpenAiDraft?.()}
+          title="Draft from prompt via local Ollama"
+        >
           <Sparkles className="w-3.5 h-3.5" /> AI draft
-        </Button>
-        <Button variant="ghost" size="sm" onClick={() => onOpenRuleSettings?.()} title="Edit rule metadata">
+        </button>
+        <button
+          className="btn ghost sm"
+          onClick={() => onOpenRuleSettings?.()}
+          title="Edit rule metadata"
+        >
           <Settings2 className="w-3.5 h-3.5" /> Rule
-        </Button>
-        <Button variant="outline" size="sm" onClick={() => onTest?.()}>
+        </button>
+        <button className="btn sm" onClick={() => onTest?.()}>
           <Play className="w-3.5 h-3.5" /> Test
-        </Button>
+        </button>
 
         {/* Rule-validity indicator. Click to open the issues popover. */}
         <ValidityBadge
@@ -209,30 +256,24 @@ export function Toolbar({ onTest, onOpenRuleSettings, onOpenAiDraft }: Props = {
           }}
         />
 
-        <div className="h-5 w-px bg-border shrink-0 mx-1" />
+        <div className="h-5 w-px shrink-0 mx-1" style={{ background: "var(--border)" }} />
 
         <span
-          className={cn(
-            "inline-flex items-center gap-1.5 px-2 h-6 rounded-full text-[10.5px] font-medium border transition-colors",
-            dirty
-              ? "bg-amber-50 text-amber-900 border-amber-200 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-900"
-              : "bg-muted/50 text-muted-foreground border-border",
-          )}
+          className={cn("status-badge", dirty ? "review" : "draft")}
           title={dirty ? "You have unsaved edits" : "All changes saved"}
         >
-          <span className={cn("w-1.5 h-1.5 rounded-full", dirty ? "bg-amber-500 animate-pulse" : "bg-muted-foreground/40")} />
+          <span className="dot" style={dirty ? { animation: "pulse 2s infinite" } : undefined} />
           {dirty ? "Unsaved" : "Saved"}
         </span>
 
-        <Button
-          variant="default"
-          size="sm"
+        <button
+          className="btn primary sm"
           onClick={() => void save()}
           disabled={busy || !dirty}
           title={dirty ? "Save (⌘S)" : "All changes saved"}
         >
           <Save className="w-3.5 h-3.5" /> Save
-        </Button>
+        </button>
       </div>
     </header>
   );
@@ -270,7 +311,7 @@ function ValidityBadge({
   if (issues.length === 0) {
     return (
       <span
-        className="inline-flex items-center gap-1.5 px-2 h-6 rounded-full text-[10.5px] font-medium border bg-emerald-50 text-emerald-900 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-200 dark:border-emerald-900"
+        className="status-badge live"
         title="Rule looks good — no validation issues."
       >
         <CheckCircle2 className="w-3 h-3" />
@@ -278,20 +319,16 @@ function ValidityBadge({
       </span>
     );
   }
-  const tone = errors.length > 0
-    ? "bg-red-50 text-red-900 border-red-200 dark:bg-red-950/30 dark:text-red-200 dark:border-red-900"
-    : "bg-amber-50 text-amber-900 border-amber-200 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-900";
+  const tone = errors.length > 0 ? "fail" : "review";
 
   return (
     <div className="relative">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className={cn(
-          "inline-flex items-center gap-1.5 px-2 h-6 rounded-full text-[10.5px] font-medium border transition-colors hover:opacity-90",
-          tone,
-        )}
+        className={`status-badge ${tone}`}
         title="Click to see validation issues"
+        style={{ cursor: "pointer" }}
       >
         <AlertTriangle className="w-3 h-3" />
         {errors.length > 0 ? `${errors.length} ${errors.length === 1 ? "error" : "errors"}` : null}
@@ -302,27 +339,59 @@ function ValidityBadge({
       {open ? (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-1.5 z-20 w-[420px] max-h-[400px] overflow-auto rounded-lg border bg-popover shadow-lg">
-            <div className="px-3 py-2 border-b bg-muted/30 text-[11px] uppercase tracking-wider font-semibold text-muted-foreground/80">
+          <div
+            className="absolute right-0 top-full mt-1.5 z-20 w-[420px] max-h-[400px] overflow-auto"
+            style={{
+              background: "var(--popover)",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              boxShadow: "var(--shadow-md)",
+            }}
+          >
+            <div
+              className="px-3 py-2 text-[11px] uppercase tracking-wider font-semibold"
+              style={{
+                borderBottom: "1px solid var(--border)",
+                background: "var(--panel-2)",
+                color: "var(--text-muted)",
+              }}
+            >
               Issues
             </div>
-            <div className="divide-y">
+            <div className="divide-y" style={{ borderColor: "var(--border)" }}>
               {[...errors, ...warnings].map((issue, i) => (
                 <button
                   key={i}
                   onClick={() => onJump(issue.target)}
-                  className="w-full text-left px-3 py-2 flex items-start gap-2 hover:bg-muted/40 transition-colors"
+                  className="w-full text-left px-3 py-2 flex items-start gap-2 transition-colors"
+                  style={{ background: "transparent" }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "var(--panel-2)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                  }}
                 >
-                  <div className={cn(
-                    "w-4 h-4 rounded-full inline-flex items-center justify-center shrink-0 mt-0.5",
-                    issue.severity === "error" ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300" : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
-                  )}>
+                  <div
+                    className="w-4 h-4 rounded-full inline-flex items-center justify-center shrink-0 mt-0.5"
+                    style={{
+                      background: issue.severity === "error" ? "var(--danger-soft)" : "var(--warn-soft)",
+                      color: issue.severity === "error" ? "var(--danger)" : "var(--warn)",
+                    }}
+                  >
                     <AlertTriangle className="w-2.5 h-2.5" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="text-[12px] text-foreground leading-snug">{issue.message}</div>
-                    <div className="text-[10px] text-muted-foreground/80 font-mono mt-0.5">
-                      {issue.kind} · {issue.target.kind === "instance" ? issue.target.instanceId : issue.target.kind === "edge" ? issue.target.edgeId : "rule"}
+                    <div className="text-[12px] leading-snug" style={{ color: "var(--text)" }}>
+                      {issue.message}
+                    </div>
+                    <div className="text-[10px] mono mt-0.5" style={{ color: "var(--text-muted)" }}>
+                      {issue.kind} ·{" "}
+                      {issue.target.kind === "instance"
+                        ? issue.target.instanceId
+                        : issue.target.kind === "edge"
+                        ? issue.target.edgeId
+                        : "rule"}
                     </div>
                   </div>
                 </button>
