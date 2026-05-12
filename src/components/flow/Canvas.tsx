@@ -307,17 +307,35 @@ function CanvasInner() {
         fitViewOptions={{ padding: 0.2, maxZoom: 1.2 }}
         minZoom={0.2}
         maxZoom={2}
-        style={{ background: "var(--muted)" }}
+        defaultEdgeOptions={{
+          type: "smoothstep",
+          style: { stroke: "var(--border-strong)", strokeWidth: 1.6 },
+        }}
+        style={{ background: "var(--bg)" }}
       >
-        <Background gap={16} size={1} color="rgba(0,0,0,0.05)" />
-        <Controls position="bottom-left" showInteractive={false} />
+        <Background gap={22} size={1} color="var(--border)" />
+        <Controls
+          position="bottom-left"
+          showInteractive={false}
+          style={{
+            background: "var(--panel)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-md)",
+            boxShadow: "var(--shadow-sm)",
+          }}
+        />
         <MiniMap
           position="bottom-right"
           pannable
           zoomable
           nodeStrokeColor={() => "transparent"}
-          nodeColor={() => "#94a3b8"}
-          style={{ background: "var(--background)" }}
+          nodeColor={() => "var(--border-strong)"}
+          maskColor="rgba(0, 0, 0, 0.04)"
+          style={{
+            background: "var(--panel)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-md)",
+          }}
         />
       </ReactFlow>
 
