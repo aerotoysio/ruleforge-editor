@@ -7,7 +7,7 @@ import { Save, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import type { OutputTemplate } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Button } from "@/components/ui/button";
+
 import { Input } from "@/components/ui/Input";
 import { slugify } from "@/lib/slug";
 
@@ -65,9 +65,9 @@ export function NewTemplateClient() {
           </Link>
         }
         actions={
-          <Button variant="default" onClick={save} disabled={busy || !name.trim()}>
+          <button className="btn primary" onClick={save} disabled={busy || !name.trim()}>
             <Save className="w-3.5 h-3.5" /> Create template
-          </Button>
+          </button>
         }
       />
       <div className="flex-1 overflow-auto px-8 py-6">

@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { ArrowRight, Sparkles } from "lucide-react";
 import type { JsonSchema, Rule } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Button } from "@/components/ui/button";
+
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { slugify } from "@/lib/slug";
@@ -143,12 +143,12 @@ export function NewRuleClient() {
             </div>
 
             <div className="flex justify-end gap-2 pt-2 border-t">
-              <Button variant="ghost" size="sm" onClick={() => router.push("/rules")} disabled={busy}>
+              <button className="btn ghost sm" onClick={() => router.push("/rules")} disabled={busy}>
                 Cancel
-              </Button>
-              <Button variant="default" size="sm" onClick={create} disabled={busy || !name.trim() || !computedId.trim() || !endpoint.trim()}>
+              </button>
+              <button className="btn primary sm" onClick={create} disabled={busy || !name.trim() || !computedId.trim() || !endpoint.trim()}>
                 Create rule <ArrowRight className="w-3.5 h-3.5" />
-              </Button>
+              </button>
             </div>
           </div>
         </div>

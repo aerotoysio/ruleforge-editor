@@ -3,7 +3,6 @@ import { Plus, LayoutTemplate } from "lucide-react";
 import { requireWorkspace } from "@/lib/server/require-workspace";
 import { listTemplates } from "@/lib/server/workspace";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/EmptyState";
 
 export default async function TemplatesPage() {
@@ -28,13 +27,16 @@ export default async function TemplatesPage() {
         description="Reusable shapes for the objects a rule emits — bag-fee lines, tax lines, discount lines. A constant or mutator-set node can fill a template field-by-field instead of authoring the whole object as a free-form literal."
         actions={
           <Link href="/templates/new">
-            <Button variant="default">
+            <button className="btn primary">
               <Plus className="w-3.5 h-3.5" /> New template
-            </Button>
+            </button>
           </Link>
         }
       />
-      <div className="flex-1 overflow-auto px-8 py-6">
+      <div
+        className="flex-1 overflow-auto"
+        style={{ padding: "8px 28px 80px", background: "var(--bg)" }}
+      >
         {templates.length === 0 ? (
           <EmptyState
             icon={<LayoutTemplate className="w-8 h-8" />}
@@ -42,44 +44,61 @@ export default async function TemplatesPage() {
             description="Templates capture the shape of repeating output objects (a bag-fee line, a tax line, a discount line). Once defined, a rule can fill one in field-by-field rather than typing the whole object as a literal each time."
             action={
               <Link href="/templates/new">
-                <Button variant="default">
+                <button className="btn primary">
                   <Plus className="w-3.5 h-3.5" /> New template
-                </Button>
+                </button>
               </Link>
             }
           />
         ) : (
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col" style={{ gap: 18 }}>
             {Array.from(groups.entries()).map(([category, items]) => (
-              <section key={category} className="flex flex-col gap-2">
-                <h2 className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground/80 font-semibold px-3">
+              <section key={category} className="tbl-wrap">
+                <div
+                  style={{
+                    padding: "10px 14px",
+                    fontSize: 11,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.07em",
+                    color: "var(--text-muted)",
+                    fontWeight: 600,
+                    background: "var(--panel-2)",
+                    borderBottom: "1px solid var(--border)",
+                  }}
+                >
                   {category}
-                </h2>
-                <div className="grid grid-cols-[2fr_3fr_0.6fr_auto] gap-3 px-3 text-[11px] uppercase tracking-wider text-muted-foreground/70">
-                  <div>Name</div>
-                  <div>Description</div>
-                  <div>Fields</div>
-                  <div className="text-right">Updated</div>
                 </div>
-                {items.map((t) => (
-                  <Link
-                    key={t.id}
-                    href={`/templates/${encodeURIComponent(t.id)}`}
-                    className="grid grid-cols-[2fr_3fr_0.6fr_auto] gap-3 px-3 py-3 rounded items-center bg-card border border-border hover:border-foreground/30 transition-colors"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-[13px] font-medium truncate text-foreground">{t.name}</div>
-                      <div className="text-[11px] font-mono truncate text-muted-foreground">{t.id}</div>
-                    </div>
-                    <div className="text-[12px] truncate text-muted-foreground/90">
-                      {t.description ?? "—"}
-                    </div>
-                    <div className="text-[12px] tabular-nums">{t.fieldCount}</div>
-                    <div className="text-[11px] text-right text-muted-foreground">
-                      {t.updatedAt ? new Date(t.updatedAt).toLocaleDateString() : "—"}
-                    </div>
-                  </Link>
-                ))}
+                <table className="tbl">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Description</th>
+                      <th className="num" style={{ width: 80 }}>Fields</th>
+                      <th style={{ width: 120 }}>Updated</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((t) => (
+                      <tr key={t.id} style={{ cursor: "pointer" }}>
+                        <td>
+                          <Link href={`/templates/${encodeURIComponent(t.id)}`} style={{ display: "block" }}>
+                            <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                              <span className="mono" style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
+                                {t.id}
+                              </span>
+                              <span style={{ fontWeight: 500, color: "var(--text)" }}>{t.name}</span>
+                            </div>
+                          </Link>
+                        </td>
+                        <td style={{ color: "var(--text-dim)" }}>{t.description ?? "—"}</td>
+                        <td className="num mono">{t.fieldCount}</td>
+                        <td className="muted">
+                          {t.updatedAt ? new Date(t.updatedAt).toLocaleDateString() : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </section>
             ))}
           </div>

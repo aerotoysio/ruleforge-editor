@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Save, Trash2 } from "lucide-react";
 import type { ReferenceSet } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Button } from "@/components/ui/button";
+
 import { Input } from "@/components/ui/Input";
 import { ReferenceTableEditor } from "@/components/refs/ReferenceTableEditor";
 
@@ -71,12 +71,12 @@ export function EditReferenceClient({ initial }: { initial: ReferenceSet }) {
         description={`${initial.id} · ${columns.length} columns · ${rows.length} rows`}
         actions={
           <>
-            <Button variant="destructive" onClick={remove} disabled={busy}>
+            <button className="btn danger" onClick={remove} disabled={busy}>
               <Trash2 className="w-3.5 h-3.5" /> Delete
-            </Button>
-            <Button variant="default" onClick={save} disabled={busy}>
+            </button>
+            <button className="btn primary" onClick={save} disabled={busy}>
               <Save className="w-3.5 h-3.5" /> Save
-            </Button>
+            </button>
           </>
         }
       />

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Folder, FolderPlus, Save } from "lucide-react";
-import { Button } from "@/components/ui/button";
+
 import { Input } from "@/components/ui/Input";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useWorkspace } from "@/components/shell/WorkspaceProvider";
@@ -111,9 +111,9 @@ export function SettingsClient({ initial }: { initial: Initial }) {
                 placeholder="C:\\Users\\you\\rules-workspace  or  /home/you/rules-workspace"
                 className="mono"
               />
-              <Button onClick={() => save(false)} disabled={busy} variant="default">
+              <button className="btn primary" onClick={() => save(false)} disabled={busy}>
                 <Save className="w-3.5 h-3.5" /> Save
-              </Button>
+              </button>
             </div>
             {needsSeed ? (
               <div
@@ -123,9 +123,9 @@ export function SettingsClient({ initial }: { initial: Initial }) {
                 <span>
                   No <code className="mono">workspace.json</code> at that path. Initialize it to create the folder structure.
                 </span>
-                <Button onClick={() => save(true)} disabled={busy} variant="default" size="sm">
+                <button className="btn primary sm" onClick={() => save(true)} disabled={busy}>
                   <FolderPlus className="w-3.5 h-3.5" /> Initialize workspace
-                </Button>
+                </button>
               </div>
             ) : null}
             {initial.recentRoots.length ? (
