@@ -5,4 +5,5 @@ export * from "./envelope";
 export * from "./workspace";
 export * from "./node-def";
 export * from "./output-template";
+export * from "./schema-template";
 export * from "./asset";

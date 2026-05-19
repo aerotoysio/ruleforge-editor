@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Play, X, Wand2, Loader2, Save, FlaskConical } from "lucide-react";
+import { Play, X, Wand2, Loader2, Save, FlaskConical, ChevronRight, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { useRuleStore } from "@/lib/store/rule-store";
+import { useNodesStore } from "@/lib/store/nodes-store";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/Select";
 import { Input } from "@/components/ui/Input";
 import { emptyPayload } from "@/lib/schema/empty-payload";
 import { slugify } from "@/lib/slug";
-import type { Envelope, RuleTest, TraceOutcome } from "@/lib/types";
+import type { Envelope, RuleTest, TraceEntry, TraceOutcome } from "@/lib/types";
 
 type Props = {
   open: boolean;
@@ -30,6 +31,13 @@ export function TestPanel({ open, onClose, prefill }: Props) {
   const [saveMode, setSaveMode] = useState(false);
   const [saveName, setSaveName] = useState("");
   const [prefillBanner, setPrefillBanner] = useState<string | null>(null);
+  const [timing, setTiming] = useState<{
+    mode: "http" | "cli";
+    totalMs: number;
+    stageMs: number;
+    engineMs: number;
+    fellBackFromHttp?: boolean;
+  } | null>(null);
 
   // The dropdown reads the rule's per-rule tests directly — no API call.
   // This is the same store the Tests tab edits, so changes propagate live.
@@ -119,6 +127,7 @@ export function TestPanel({ open, onClose, prefill }: Props) {
     setBusy(true);
     setEnvelope(null);
     setStderr(null);
+    setTiming(null);
     try {
       const res = await fetch("/api/test", {
         method: "POST",
@@ -129,12 +138,15 @@ export function TestPanel({ open, onClose, prefill }: Props) {
       if (!res.ok) {
         toast.error(data.error ?? "Test failed");
         setStderr([data.error, data.stderr, data.stdout].filter(Boolean).join("\n\n"));
+        if (data.timing) setTiming(data.timing);
         return;
       }
       setEnvelope(data.envelope);
       setStderr(data.stderr ?? null);
+      if (data.timing) setTiming(data.timing);
       applyTrace(data.envelope as Envelope, setTrace);
-      toast.success(`Decision: ${data.envelope?.decision ?? "?"}`);
+      const ms = data.timing?.totalMs ? ` · ${data.timing.totalMs}ms` : "";
+      toast.success(`Decision: ${data.envelope?.decision ?? "?"}${ms}`);
     } finally {
       setBusy(false);
     }
@@ -180,6 +192,51 @@ export function TestPanel({ open, onClose, prefill }: Props) {
             ))}
           </Select>
         </div>
+        {timing ? (
+          <span
+            className="status-badge"
+            style={{
+              marginLeft: 8,
+              background:
+                timing.mode === "http"
+                  ? "var(--success-soft)"
+                  : timing.fellBackFromHttp
+                  ? "var(--warn-soft)"
+                  : "var(--panel-2)",
+              color:
+                timing.mode === "http"
+                  ? "var(--success)"
+                  : timing.fellBackFromHttp
+                  ? "var(--warn)"
+                  : "var(--text-dim)",
+              borderColor: "transparent",
+            }}
+            title={
+              timing.mode === "http"
+                ? `Engine HTTP — ~${timing.engineMs}ms engine + ${timing.stageMs}ms stage. Fast path active.`
+                : timing.fellBackFromHttp
+                ? `Engine URL is set but the HTTP engine didn't respond — fell back to CLI (~${timing.engineMs}ms). Start the engine server (see /commands) for ~25× speedup.`
+                : `Engine CLI — dotnet startup costs ~${timing.engineMs - 1}ms. Set Engine URL in Settings to switch to HTTP mode (~25× faster).`
+            }
+          >
+            <span
+              className="dot"
+              style={{
+                background:
+                  timing.mode === "http"
+                    ? "var(--success)"
+                    : timing.fellBackFromHttp
+                    ? "var(--warn)"
+                    : "var(--text-muted)",
+              }}
+            />
+            {timing.mode === "http"
+              ? "HTTP"
+              : timing.fellBackFromHttp
+              ? "CLI (HTTP unreachable)"
+              : "CLI"} · {timing.totalMs}ms
+          </span>
+        ) : null}
         <div className="ml-auto flex items-center gap-1.5">
           <Button size="sm" onClick={autoGenerate}>
             <Wand2 className="w-3.5 h-3.5" /> Auto from schema
@@ -298,21 +355,256 @@ function EnvelopeView({ envelope }: { envelope: Envelope }) {
           {JSON.stringify(envelope.result ?? null, null, 2)}
         </pre>
       </div>
-      {envelope.trace?.length ? (
-        <div>
-          <div className="text-[10px] uppercase tracking-wider mb-1" style={{ color: "var(--color-fg-dim)" }}>Trace ({envelope.trace.length})</div>
-          <div className="flex flex-col gap-1">
-            {envelope.trace.map((t, i) => (
-              <div key={i} className="grid grid-cols-[auto_1fr_auto] gap-2 items-center px-2 py-1 rounded" style={{ background: "var(--color-bg-soft)" }}>
-                <OutcomeDot outcome={t.outcome} />
-                <span className="mono text-[11px] truncate" title={t.nodeId}>{t.nodeId}</span>
-                <span className="text-[10px]" style={{ color: "var(--color-fg-muted)" }}>{t.durationMs} ms</span>
-              </div>
-            ))}
-          </div>
+      {envelope.trace?.length ? <TraceView entries={envelope.trace} /> : null}
+    </div>
+  );
+}
+
+/**
+ * Trace view — one row per node-instance the engine executed, with the rich
+ * data the engine ships (input / output / context reads / writes / error)
+ * collapsed under a chevron. Click any row to expand and see what the node
+ * actually emitted — this is what makes the "why didn't the response change
+ * when I edited the request?" question answerable: you can SEE which node
+ * read the field you tweaked and what it emitted downstream.
+ *
+ * The trace also implicitly tells you which branch fired — nodes that didn't
+ * execute don't appear, so a filter's `fail` branch vs `pass` branch is
+ * visible by which downstream constant ran.
+ */
+function TraceView({ entries }: { entries: TraceEntry[] }) {
+  // Resolve instanceId → friendly label by walking the live rule. Labels are
+  // way easier to scan than `n4` / `n5` ids.
+  const rule = useRuleStore((s) => s.rule);
+  const nodeDefs = useNodesStore((s) => s.nodes);
+  const instanceById = new Map<string, { label: string; nodeId: string; category: string; accent: string; badge: string }>();
+  if (rule) {
+    for (const inst of rule.instances) {
+      const def = nodeDefs.find((d) => d.id === inst.nodeId);
+      instanceById.set(inst.instanceId, {
+        label: inst.label ?? def?.name ?? inst.instanceId,
+        nodeId: inst.nodeId,
+        category: def?.category ?? "unknown",
+        accent: def?.ui?.accent ?? "#64748b",
+        badge: def?.ui?.badge ?? "?",
+      });
+    }
+  }
+
+  return (
+    <div>
+      <div
+        className="text-[10px] uppercase tracking-wider mb-1"
+        style={{ color: "var(--color-fg-dim)" }}
+      >
+        Trace ({entries.length})
+      </div>
+      <div className="flex flex-col" style={{ gap: 2 }}>
+        {entries.map((t, i) => (
+          <TraceRow key={i} entry={t} step={i + 1} instance={instanceById.get(t.nodeId)} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TraceRow({
+  entry,
+  step,
+  instance,
+}: {
+  entry: TraceEntry;
+  step: number;
+  instance?: { label: string; nodeId: string; category: string; accent: string; badge: string };
+}) {
+  // Auto-expand error rows so they're visible without an extra click.
+  const [open, setOpen] = useState<boolean>(entry.outcome === "error" || !!entry.error);
+  const hasDetail =
+    entry.input !== undefined
+    || entry.output !== undefined
+    || (entry.ctxRead && Object.keys(entry.ctxRead).length > 0)
+    || (entry.ctxWritten && Object.keys(entry.ctxWritten).length > 0)
+    || !!entry.error;
+
+  return (
+    <div
+      style={{
+        borderRadius: 6,
+        background: entry.outcome === "error" ? "var(--danger-soft)" : "var(--panel-2)",
+        border: "1px solid",
+        borderColor: entry.outcome === "error" ? "var(--danger)" : "var(--border)",
+        overflow: "hidden",
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => hasDetail && setOpen(!open)}
+        disabled={!hasDetail}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "20px 22px 22px 1fr auto auto",
+          gap: 8,
+          alignItems: "center",
+          width: "100%",
+          padding: "6px 10px",
+          background: "transparent",
+          border: 0,
+          textAlign: "left",
+          cursor: hasDetail ? "pointer" : "default",
+        }}
+      >
+        <span style={{ color: "var(--text-faint)", fontSize: 10.5, fontVariantNumeric: "tabular-nums" }}>
+          {step}
+        </span>
+        <span style={{ display: "inline-grid", placeItems: "center", color: "var(--text-muted)" }}>
+          {hasDetail ? (
+            open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />
+          ) : null}
+        </span>
+        <span
+          style={{
+            display: "inline-grid",
+            placeItems: "center",
+            width: 22, height: 18,
+            borderRadius: 4,
+            fontFamily: "var(--font-mono)",
+            fontSize: 9,
+            fontWeight: 700,
+            background: instance?.accent ?? "var(--text-muted)",
+            color: "#fff",
+          }}
+          title={instance ? `${instance.nodeId} (${instance.category})` : entry.nodeId}
+        >
+          {instance?.badge ?? "?"}
+        </span>
+        <span style={{ fontSize: 12, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {instance?.label ?? entry.nodeId}
+          <span className="mono" style={{ marginLeft: 6, fontSize: 10, color: "var(--text-faint)" }}>
+            {entry.nodeId}
+          </span>
+        </span>
+        <OutcomeBadge outcome={entry.outcome} />
+        <span style={{ fontSize: 10.5, color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
+          {entry.durationMs} ms
+        </span>
+      </button>
+
+      {open && hasDetail ? (
+        <div style={{ borderTop: "1px solid var(--border)", padding: "8px 12px", background: "var(--panel)" }}>
+          {entry.error ? (
+            <DetailBlock label="Error" tone="danger">
+              <pre className="mono" style={{ margin: 0, fontSize: 11, whiteSpace: "pre-wrap", color: "var(--danger)" }}>
+                {entry.error}
+              </pre>
+            </DetailBlock>
+          ) : null}
+          {entry.input !== undefined ? (
+            <DetailBlock label="Input">
+              <JsonPreview value={entry.input} />
+            </DetailBlock>
+          ) : null}
+          {entry.output !== undefined ? (
+            <DetailBlock label="Output">
+              <JsonPreview value={entry.output} />
+            </DetailBlock>
+          ) : null}
+          {entry.ctxRead && Object.keys(entry.ctxRead).length > 0 ? (
+            <DetailBlock label={`Context read (${Object.keys(entry.ctxRead).length})`}>
+              <JsonPreview value={entry.ctxRead} />
+            </DetailBlock>
+          ) : null}
+          {entry.ctxWritten && Object.keys(entry.ctxWritten).length > 0 ? (
+            <DetailBlock label={`Context written (${Object.keys(entry.ctxWritten).length})`}>
+              <JsonPreview value={entry.ctxWritten} />
+            </DetailBlock>
+          ) : null}
+          {entry.subRuleRunId ? (
+            <DetailBlock label="Sub-rule run id">
+              <span className="mono" style={{ fontSize: 11, color: "var(--text-dim)" }}>
+                {entry.subRuleRunId}
+              </span>
+            </DetailBlock>
+          ) : null}
         </div>
       ) : null}
     </div>
+  );
+}
+
+function DetailBlock({ label, tone, children }: { label: string; tone?: "danger"; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <div
+        style={{
+          fontSize: 9.5,
+          fontWeight: 600,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          color: tone === "danger" ? "var(--danger)" : "var(--text-muted)",
+          marginBottom: 3,
+        }}
+      >
+        {label}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function JsonPreview({ value }: { value: unknown }) {
+  // Pretty-print at most ~400 chars inline — anything bigger gets a
+  // collapsible. JSON bodies for non-leaf nodes can be the entire request.
+  const json = JSON.stringify(value, null, 2);
+  const trimmed = json.length > 800;
+  return (
+    <pre
+      className="mono"
+      style={{
+        margin: 0,
+        padding: "6px 8px",
+        background: "var(--bg)",
+        border: "1px solid var(--border)",
+        borderRadius: 4,
+        fontSize: 11,
+        lineHeight: 1.45,
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-word",
+        maxHeight: trimmed ? 200 : "none",
+        overflow: trimmed ? "auto" : "visible",
+        color: "var(--text)",
+      }}
+    >
+      {json}
+    </pre>
+  );
+}
+
+function OutcomeBadge({ outcome }: { outcome: TraceOutcome }) {
+  const styles: Record<TraceOutcome, { bg: string; fg: string }> = {
+    pass:  { bg: "var(--success-soft)", fg: "var(--success)" },
+    fail:  { bg: "var(--danger-soft)",  fg: "var(--danger)" },
+    skip:  { bg: "var(--panel-2)",      fg: "var(--text-muted)" },
+    error: { bg: "var(--danger-soft)",  fg: "var(--danger)" },
+  };
+  const s = styles[outcome];
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        height: 16,
+        padding: "0 6px",
+        borderRadius: 8,
+        background: s.bg,
+        color: s.fg,
+        fontSize: 9.5,
+        fontWeight: 600,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+      }}
+    >
+      {outcome}
+    </span>
   );
 }
 
@@ -320,6 +612,8 @@ function OutcomeDot({ outcome }: { outcome: TraceOutcome }) {
   const c = outcome === "pass" ? "var(--color-pass)" : outcome === "fail" ? "var(--color-fail)" : outcome === "skip" ? "var(--color-skip)" : "var(--color-fail)";
   return <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: c }} />;
 }
+// Keep OutcomeDot exported in scope — Canvas / NodeView use it elsewhere
+// via the rule store's `trace` overlay; not from this file directly.
 
 function Empty({ msg }: { msg: string }) {
   return <div className="text-[12px] py-6 text-center" style={{ color: "var(--color-fg-muted)" }}>{msg}</div>;

@@ -7,7 +7,6 @@ import { Save } from "lucide-react";
 import type { ReferenceSet } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 
-import { Input } from "@/components/ui/Input";
 import { ReferenceTableEditor } from "@/components/refs/ReferenceTableEditor";
 import { slugify } from "@/lib/slug";
 
@@ -71,32 +70,47 @@ export function NewReferenceClient() {
           </button>
         }
       />
-      <div className="flex-1 overflow-auto px-8 py-6">
+      <div className="flex-1 overflow-auto" style={{ background: "var(--bg)", padding: "24px 28px" }}>
         <div className="max-w-5xl flex flex-col gap-6">
           <section
-            className="rounded p-5 grid grid-cols-3 gap-4"
-            style={{ background: "var(--color-bg)", border: "1px solid var(--color-border)" }}
+            className="grid grid-cols-3 gap-4"
+            style={{
+              background: "var(--panel)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-lg)",
+              boxShadow: "var(--shadow-sm)",
+              padding: 22,
+            }}
           >
             <Field label="Name">
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Bag price matrix" />
+              <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Bag price matrix" />
             </Field>
             <Field label="ID">
-              <Input
+              <input
+                className="input mono"
+                style={{ fontFamily: "var(--font-mono)" }}
                 value={computedId}
                 onChange={(e) => { setId(e.target.value); setIdEdited(true); }}
-                className="mono"
               />
             </Field>
             <Field label="Description" full>
-              <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="(optional)" />
+              <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="(optional)" />
             </Field>
           </section>
 
           <section
-            className="rounded p-5 flex flex-col gap-3"
-            style={{ background: "var(--color-bg)", border: "1px solid var(--color-border)" }}
+            className="flex flex-col gap-3"
+            style={{
+              background: "var(--panel)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-lg)",
+              boxShadow: "var(--shadow-sm)",
+              padding: 22,
+            }}
           >
-            <h2 className="text-[14px] font-medium tracking-tight">Columns &amp; rows</h2>
+            <h2 style={{ fontSize: 14, fontWeight: 500, letterSpacing: "-0.012em", color: "var(--text)", margin: 0 }}>
+              Columns &amp; rows
+            </h2>
             <ReferenceTableEditor
               columns={columns}
               rows={rows}
@@ -112,8 +126,18 @@ export function NewReferenceClient() {
 
 function Field({ label, children, full }: { label: string; children: React.ReactNode; full?: boolean }) {
   return (
-    <label className={`flex flex-col gap-1 ${full ? "col-span-3" : ""}`}>
-      <span className="text-[11px] uppercase tracking-wider" style={{ color: "var(--color-fg-dim)" }}>{label}</span>
+    <label className={`flex flex-col gap-1.5 ${full ? "col-span-3" : ""}`}>
+      <span
+        style={{
+          fontSize: 10.5,
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+          fontWeight: 600,
+          color: "var(--text-muted)",
+        }}
+      >
+        {label}
+      </span>
       {children}
     </label>
   );

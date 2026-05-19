@@ -157,23 +157,51 @@ export function NodeDefEditor({ initial, mode }: Props) {
           </div>
         }
       />
-      <div className="flex-1 overflow-auto bg-muted/30">
+      <div className="flex-1 overflow-auto" style={{ background: "var(--bg)" }}>
         <div className="max-w-3xl mx-auto px-8 py-8 flex flex-col gap-5">
           {mode.kind === "edit" && mode.isSeed ? (
-            <div className="rounded-md border bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900 px-3.5 py-2.5 flex items-start gap-2.5">
-              <AlertTriangle className="w-4 h-4 mt-0.5 text-blue-700 dark:text-blue-300 shrink-0" />
-              <div className="text-[12px] text-blue-900 dark:text-blue-200 leading-relaxed">
-                <strong>Built-in node.</strong> Saving creates a workspace-local override at <code className="font-mono">/nodes/{id}.json</code>.
+            <div
+              style={{
+                border: "1px solid var(--accent-soft)",
+                background: "var(--accent-soft)",
+                borderRadius: 8,
+                padding: "10px 14px",
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 10,
+              }}
+            >
+              <AlertTriangle
+                className="w-4 h-4 shrink-0"
+                style={{ marginTop: 2, color: "var(--accent)" }}
+              />
+              <div style={{ fontSize: 12, color: "var(--accent)", lineHeight: 1.5 }}>
+                <strong>Built-in node.</strong> Saving creates a workspace-local override at{" "}
+                <code style={{ fontFamily: "var(--font-mono)" }}>/nodes/{id}.json</code>.{" "}
                 Future updates to the seed library won&rsquo;t replace your override.
               </div>
             </div>
           ) : null}
 
           {isUnsupported ? (
-            <div className="rounded-md border bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900 px-3.5 py-2.5 flex items-start gap-2.5">
-              <AlertTriangle className="w-4 h-4 mt-0.5 text-amber-700 dark:text-amber-300 shrink-0" />
-              <div className="text-[12px] text-amber-900 dark:text-amber-200 leading-relaxed">
-                <strong>Pending engine support.</strong> The <code className="font-mono">{draft.category}</code> category is declared
+            <div
+              style={{
+                border: "1px solid var(--warn-soft)",
+                background: "var(--warn-soft)",
+                borderRadius: 8,
+                padding: "10px 14px",
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 10,
+              }}
+            >
+              <AlertTriangle
+                className="w-4 h-4 shrink-0"
+                style={{ marginTop: 2, color: "var(--warn)" }}
+              />
+              <div style={{ fontSize: 12, color: "var(--warn)", lineHeight: 1.5 }}>
+                <strong>Pending engine support.</strong> The{" "}
+                <code style={{ fontFamily: "var(--font-mono)" }}>{draft.category}</code> category is declared
                 but currently throws at evaluation time. You can author against it; rules will load but won&rsquo;t run until the engine ships
                 support.
               </div>
@@ -334,15 +362,35 @@ export function NodeDefEditor({ initial, mode }: Props) {
 
 function Section({ title, subtitle, action, children }: { title: string; subtitle?: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
-      <div className="px-4 py-3 border-b bg-muted/30 flex items-center justify-between gap-2">
+    <div
+      style={{
+        background: "var(--panel)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius-lg)",
+        boxShadow: "var(--shadow-sm)",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          padding: "12px 18px",
+          borderBottom: "1px solid var(--border)",
+          background: "var(--panel-2)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 10,
+        }}
+      >
         <div>
-          <div className="text-[12px] uppercase tracking-[0.1em] text-muted-foreground/80 font-semibold">{title}</div>
-          {subtitle ? <div className="text-[11.5px] text-muted-foreground mt-0.5">{subtitle}</div> : null}
+          <div className="field-label">{title}</div>
+          {subtitle ? (
+            <div style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 2 }}>{subtitle}</div>
+          ) : null}
         </div>
         {action}
       </div>
-      <div className="px-4 py-3 flex flex-col gap-3">{children}</div>
+      <div style={{ padding: "16px 18px", display: "flex", flexDirection: "column", gap: 12 }}>{children}</div>
     </div>
   );
 }

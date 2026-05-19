@@ -1,7 +1,6 @@
 "use client";
 
 import { Sparkles, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 
 type Props = {
@@ -21,31 +20,70 @@ export function AiDraftSheet({ open, onClose }: Props) {
           Draft a rule from a natural-language prompt.
         </SheetDescription>
 
-        <header className="px-4 h-14 border-b shrink-0 flex items-center gap-2 bg-card">
-          <div className="w-8 h-8 rounded-md bg-violet-100 text-violet-700 flex items-center justify-center dark:bg-violet-950 dark:text-violet-300">
+        <header className="popup-head" style={{ paddingRight: 20 }}>
+          <span
+            className="badge"
+            style={{
+              background: "var(--accent-soft)",
+              color: "var(--accent)",
+            }}
+          >
             <Sparkles className="w-4 h-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <span className="title block">AI draft</span>
+            <span className="subtitle block">Generate a rule from a prompt</span>
           </div>
-          <div className="flex flex-col leading-tight">
-            <span className="text-[13px] font-semibold tracking-tight text-foreground">AI draft</span>
-            <span className="text-[10.5px] text-muted-foreground">Generate a rule from a prompt</span>
-          </div>
-          <button onClick={onClose} className="ml-auto w-8 h-8 inline-flex items-center justify-center rounded text-muted-foreground hover:bg-muted">
+          <button
+            onClick={onClose}
+            className="icon-btn"
+            style={{ width: 28, height: 28 }}
+            aria-label="Close AI draft"
+          >
             <X className="w-3.5 h-3.5" />
           </button>
         </header>
 
-        <div className="flex-1 overflow-auto px-5 py-6 flex flex-col gap-4">
-          <div className="rounded-md border border-dashed bg-muted/30 px-4 py-6 flex flex-col items-center text-center gap-2">
-            <Sparkles className="w-8 h-8 text-muted-foreground" />
-            <div className="text-[13px] font-medium text-foreground">AI draft is being rewired</div>
-            <p className="text-[12px] text-muted-foreground max-w-sm leading-relaxed">
-              The rule shape changed (instances + bindings against a global node library). The AI draft
-              flow will return shortly — it now needs to emit node-instance + binding shapes instead of
-              inline node configs.
+        <div className="popup-body" style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <div
+            style={{
+              border: "1px dashed var(--border)",
+              background: "var(--panel-2)",
+              borderRadius: 8,
+              padding: "28px 24px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              textAlign: "center",
+              gap: 10,
+              maxWidth: 380,
+              margin: "0 auto",
+            }}
+          >
+            <Sparkles
+              className="w-7 h-7"
+              style={{ color: "var(--accent)" }}
+            />
+            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>
+              AI draft is being rewired
+            </div>
+            <p
+              style={{
+                fontSize: 12,
+                color: "var(--text-muted)",
+                lineHeight: 1.5,
+                margin: 0,
+              }}
+            >
+              The rule shape changed (instances + bindings against a global node library). The AI draft flow will return shortly — it now needs to emit node-instance + binding shapes instead of inline node configs.
             </p>
-            <Button variant="ghost" size="sm" onClick={onClose} className="mt-2">
+            <button
+              className="btn ghost sm"
+              onClick={onClose}
+              style={{ marginTop: 8 }}
+            >
               Close
-            </Button>
+            </button>
           </div>
         </div>
       </SheetContent>

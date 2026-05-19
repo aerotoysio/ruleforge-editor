@@ -43,6 +43,24 @@
   --color-skip: #b78600;
   --color-default: #5b6470;
   --color-error: #b3261e;
+
+  /* --------------------------------------------------------------
+   * Legacy compat — old `--color-bg`, `--color-fg`, etc. vars that
+   * older inline-style components still reference (Input.tsx,
+   * Select.tsx, Card.tsx, TestPanel.tsx, SchemaEditor.tsx, …). New
+   * code uses --bg / --text / --panel-2 directly via the design
+   * tokens; these aliases keep old components painting until they
+   * get rewritten. Theme blocks below redefine --bg/--text/etc.,
+   * and the aliases follow via var() indirection automatically.
+   * -------------------------------------------------------------- */
+  --color-bg:            var(--bg);
+  --color-bg-soft:       var(--panel-2);
+  --color-fg:            var(--text);
+  --color-fg-dim:        var(--text-dim);
+  --color-fg-muted:      var(--text-muted);
+  --color-fg-faint:      var(--text-faint);
+  --color-fg-soft:       var(--text-dim);
+  --color-border-strong: var(--border-strong);
 }
 
 [data-density="compact"] {
@@ -95,7 +113,10 @@
   --secondary-foreground:         var(--text);
   --muted:                        var(--panel-2);
   --muted-foreground:             var(--text-muted);
-  --accent:                       var(--elev);
+  /* NB: deliberately do NOT remap --accent here. The design's brand-blue
+   * --accent (defined in :root via OKLCH) must survive so .btn.primary,
+   * .tree-row.active, selected node borders, etc. all paint blue. The
+   * shadcn `bg-accent` utility is remapped to panel-2 inside @theme inline. */
   --accent-foreground:            var(--text);
   --destructive:                  var(--danger);
   --border:                       var(--border);
@@ -150,7 +171,10 @@
   --secondary-foreground:         var(--text);
   --muted:                        var(--panel-2);
   --muted-foreground:             var(--text-muted);
-  --accent:                       var(--panel-2);
+  /* NB: deliberately do NOT remap --accent here. The design's brand-blue
+   * --accent (defined in :root via OKLCH) must survive so .btn.primary,
+   * .tree-row.active, selected node borders, etc. all paint blue. The
+   * shadcn `bg-accent` utility is remapped to panel-2 inside @theme inline. */
   --accent-foreground:            var(--text);
   --destructive:                  var(--danger);
   --border:                       var(--border);
@@ -226,8 +250,12 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
+  /* Tailwind `bg-accent` / `text-accent-foreground` (used by shadcn dropdowns,
+   * select items, menus) map to MUTED SURFACE, not brand blue. The brand-blue
+   * --accent var is preserved for hand-rolled CSS (.btn.primary, .tree-row.active,
+   * selected node borders, etc.). */
+  --color-accent: var(--panel-2);
+  --color-accent-foreground: var(--text);
   --color-destructive: var(--destructive);
   --color-border: var(--border);
   --color-input: var(--input);
@@ -508,10 +536,30 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
  * Page chrome — `.page`, `.page-head`, `.crumb`, `.topbar`
  * ============================================================================ */
 
+/* The `.page` container is the scrolling region of every list/detail screen.
+ * It MUST shrink inside the flex column from AppShell (otherwise content
+ * past one screen just gets clipped — the AppShell wraps children in an
+ * overflow-hidden column).
+ *   flex: 1            — fill the remaining height under the Topbar
+ *   min-height: 0      — required so the flex child can shrink below its
+ *                        natural content height, which is what enables the
+ *                        overflow-y to actually scroll
+ *   overflow-y: auto   — the scroll itself
+ *
+ * Centering wide content used to live here via `max-width: 1480px; margin: 0 auto`,
+ * but that conflicted with overflow-y on the same element. Pages that want a
+ * narrower content lane wrap their content in `.page-inner` instead. */
 .page {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
   padding: 22px 28px 80px;
+}
+
+.page-inner {
   max-width: 1480px;
-  margin: 0 auto;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .page-head {
@@ -1020,6 +1068,606 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
   display: grid; grid-template-columns: 160px 1fr; gap: 12px;
   padding: 4px 0;
   border-bottom: 1px solid var(--border);
+}
+
+/* ============================================================================
+ * Builder palette — right-side rail showing draggable node tiles, grouped by
+ * category. Used in the rule editor's graph tab. Designed to match the
+ * Admin-Portal palette: square accent badge + name + tiny description.
+ * ============================================================================ */
+
+.palette-rail {
+  width: 268px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.palette-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  flex-shrink: 0;
+}
+.palette-head .title {
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--text);
+}
+.palette-head .subtitle {
+  display: block;
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 1px;
+  letter-spacing: 0.02em;
+}
+.palette-head .manage-link {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  transition: color 0.12s;
+}
+.palette-head .manage-link:hover { color: var(--accent); }
+
+.palette-search {
+  position: relative;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  background: var(--panel);
+}
+.palette-search input {
+  width: 100%;
+  height: 28px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0 26px 0 26px;
+  font-size: 11.5px;
+  color: var(--text);
+  outline: none;
+}
+.palette-search input::placeholder { color: var(--text-faint); }
+.palette-search input:focus {
+  border-color: var(--accent);
+  background: var(--panel);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.palette-search > svg.lead {
+  position: absolute;
+  left: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  width: 12px; height: 12px;
+  pointer-events: none;
+}
+.palette-search .clear-btn {
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 18px; height: 18px;
+  display: inline-grid; place-items: center;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.palette-search .clear-btn:hover { color: var(--text); background: var(--panel-2); }
+
+.palette-body {
+  flex: 1;
+  overflow: auto;
+  padding: 10px 0 16px;
+}
+.palette-section {
+  margin-bottom: 6px;
+}
+.palette-section-head {
+  padding: 10px 16px 4px;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.palette-section-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 10px;
+}
+
+.palette-tile {
+  display: grid;
+  grid-template-columns: 14px 28px 1fr;
+  gap: 9px;
+  align-items: center;
+  padding: 7px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  cursor: grab;
+  user-select: none;
+  transition: border-color 0.12s, box-shadow 0.12s, background 0.12s;
+}
+.palette-tile:active { cursor: grabbing; }
+.palette-tile:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: var(--shadow-sm);
+}
+.palette-tile .grip {
+  color: var(--text-faint);
+  width: 13px; height: 13px;
+  transition: color 0.12s;
+}
+.palette-tile:hover .grip { color: var(--accent); }
+.palette-tile .badge {
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 5px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #fff;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.16) inset;
+}
+.palette-tile .body { min-width: 0; }
+.palette-tile .tile-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.palette-tile .tile-desc {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.palette-tile.unsupported {
+  border-color: var(--warn-soft);
+}
+.palette-tile.unsupported:hover {
+  border-color: var(--warn);
+  background: var(--warn-soft);
+}
+.palette-tile .tile-warn {
+  width: 11px; height: 11px;
+  color: var(--warn);
+  flex-shrink: 0;
+}
+
+.palette-empty {
+  margin: 12px;
+  padding: 12px;
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  border: 1px dashed var(--border);
+  border-radius: 7px;
+  background: var(--panel-2);
+}
+
+/* ============================================================================
+ * Builder tab strip — Graph / Schema / Tests tabs under the rule toolbar.
+ * Uses accent-underline on the active tab.
+ * ============================================================================ */
+
+.builder-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 40px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  flex-shrink: 0;
+}
+.builder-tab {
+  height: 100%;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s;
+}
+.builder-tab:hover { color: var(--text); }
+.builder-tab.on {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.builder-tab .pill {
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+}
+.builder-tab.on .pill {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: transparent;
+}
+
+/* ============================================================================
+ * Popup / dialog chrome — `.popup-*` classes for the node config dialog.
+ * The dialog primitive (base-ui) gives us a card surface; these classes lay
+ * out a sticky header + scrollable body + sticky footer with consistent
+ * spacing and surface tones taken from the design.
+ * ============================================================================ */
+
+.popup-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 56px 14px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
+  flex-shrink: 0;
+}
+.popup-head .badge {
+  width: 32px; height: 32px;
+  border-radius: 7px;
+  display: inline-grid;
+  place-items: center;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18) inset, 0 1px 0 rgba(255, 255, 255, 0.18) inset;
+}
+.popup-head .title {
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  color: var(--text);
+  line-height: 1.25;
+}
+.popup-head .subtitle {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.popup-body {
+  flex: 1;
+  overflow: auto;
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  background: var(--panel);
+}
+
+.popup-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--border);
+  background: var(--panel-2);
+  flex-shrink: 0;
+}
+.popup-foot .meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.popup-foot .actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 8px;
+}
+
+/* Field grouping — used for each port section inside the popup body. */
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.field-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.field-hint {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin: -2px 0 0;
+}
+
+/* Mini segmented pill (template/literal toggle, structured/JSON toggle). */
+.pill-toggle {
+  display: inline-flex;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 1px;
+  align-self: flex-start;
+}
+.pill-toggle button {
+  padding: 0 11px;
+  height: 24px;
+  font-size: 11.5px;
+  font-weight: 500;
+  border-radius: 4px;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: color 0.12s, background 0.12s;
+}
+.pill-toggle button:hover { color: var(--text); }
+.pill-toggle button.on {
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Card-style enum options — used for switch.cases enum, boolean buttons. */
+.option-card {
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+.option-card:hover { border-color: var(--border-strong); }
+.option-card.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+.option-card .opt-name {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text);
+}
+.option-card.on .opt-name { color: var(--accent); }
+.option-card .opt-desc {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+.option-card.on .opt-desc { color: var(--accent); opacity: 0.8; }
+
+/* JSON textarea — monospaced text input used for literal JSON values. */
+.json-input {
+  width: 100%;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  padding: 10px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  outline: none;
+  resize: vertical;
+  min-height: 84px;
+}
+.json-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* Schema field picker — tree of fields the user can pick to bind to. */
+.schema-tree {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel);
+  overflow: hidden;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.schema-tree-search {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel-2);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.schema-tree-rows {
+  padding: 4px;
+}
+.schema-row {
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 6px;
+  border-radius: 4px;
+  border: 0;
+  background: transparent;
+  font-size: 11.5px;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.schema-row:hover { background: var(--panel-2); }
+.schema-row.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.schema-row.root {
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: default;
+}
+.schema-row.disabled {
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+.schema-row .type {
+  margin-left: auto;
+  padding-left: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.schema-row.on .type { color: var(--accent); opacity: 0.7; }
+
+/* Best-match chip — the wand-icon suggestion strip above the schema tree. */
+.best-match-strip {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.best-match-strip .lead {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.best-match-strip .lead svg { color: var(--accent); }
+.best-match-chip {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 2px 7px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid var(--accent-soft);
+  background: var(--accent-soft);
+  color: var(--accent);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.best-match-chip:hover {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+}
+.best-match-chip.on {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+}
+
+/* Structured row editor — Excel-like grid for cases / buckets ports. */
+.struct-rows {
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  overflow: hidden;
+  background: var(--panel);
+}
+.struct-rows-head, .struct-rows-row {
+  display: grid;
+  align-items: center;
+  gap: 8px;
+}
+.struct-rows-head {
+  background: var(--panel-2);
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.struct-rows-row {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.struct-rows-row:last-child { border-bottom: 0; }
+.struct-rows-row .x {
+  width: 26px; height: 26px;
+  border-radius: 5px;
+  display: inline-grid;
+  place-items: center;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: color 0.12s, background 0.12s;
+}
+.struct-rows-row .x:hover {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+.struct-rows-empty {
+  padding: 18px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+  border: 1px dashed var(--border);
+  border-radius: 7px;
+  background: var(--panel-2);
 }
 
 @layer base {

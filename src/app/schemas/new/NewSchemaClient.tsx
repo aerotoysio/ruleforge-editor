@@ -3,50 +3,59 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Save, ArrowLeft } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
-import type { OutputTemplate } from "@/lib/types";
+import type { SchemaTemplate } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { slugify } from "@/lib/slug";
 
-export function NewTemplateClient() {
+const EMPTY_OBJECT_SCHEMA = {
+  $schema: "https://json-schema.org/draft/2020-12/schema",
+  type: "object" as const,
+  properties: {},
+  required: [] as string[],
+};
+
+export function NewSchemaClient() {
   const router = useRouter();
   const [name, setName] = useState("");
   const [id, setId] = useState("");
   const [idEdited, setIdEdited] = useState(false);
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
+  const [intent, setIntent] = useState<SchemaTemplate["intent"]>("input");
   const [busy, setBusy] = useState(false);
 
-  const computedId = idEdited ? id : (slugify(name) ? `tmpl-${slugify(name)}` : "");
+  const computedId = idEdited ? id : (slugify(name) ? `schema-${slugify(name)}` : "");
 
-  async function save() {
+  async function create() {
     if (!name.trim() || !computedId.trim()) {
       toast.error("Name is required");
       return;
     }
-    const tpl: OutputTemplate = {
+    const tpl: SchemaTemplate = {
       id: computedId,
       name: name.trim(),
       description: description.trim() || undefined,
       category: category.trim() || undefined,
-      fields: [],
+      intent,
+      schema: EMPTY_OBJECT_SCHEMA,
       updatedAt: new Date().toISOString(),
     };
     setBusy(true);
     try {
-      const res = await fetch("/api/templates", {
+      const res = await fetch("/api/schema-templates", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(tpl),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        toast.error(data.error ?? "Failed to create template");
+        toast.error(data.error ?? "Failed to create schema");
         return;
       }
-      toast.success("Template created");
-      router.push(`/templates/${encodeURIComponent(computedId)}`);
+      toast.success("Schema template created — define its shape next");
+      router.push(`/schemas/${encodeURIComponent(computedId)}`);
     } finally {
       setBusy(false);
     }
@@ -55,16 +64,20 @@ export function NewTemplateClient() {
   return (
     <>
       <PageHeader
-        title="New output template"
-        description="A reusable shape for the objects a rule emits — bag-fee line, tax line, discount line. Add fields after creating it."
+        title="New schema template"
+        description="A reusable JSON Schema shape that one or more rules can reference. Define the fields after creation on the edit page."
         eyebrow={
-          <Link href="/templates" className="inline-flex items-center gap-1 hover:text-foreground transition-colors">
-            <ArrowLeft className="w-3 h-3" /> Templates
+          <Link href="/schemas" className="inline-flex items-center gap-1 hover:text-foreground transition-colors">
+            <ArrowLeft className="w-3 h-3" /> Schemas
           </Link>
         }
         actions={
-          <button className="btn primary" onClick={save} disabled={busy || !name.trim()}>
-            <Save className="w-3.5 h-3.5" /> Create template
+          <button
+            className="btn primary sm"
+            onClick={create}
+            disabled={busy || !name.trim() || !computedId.trim()}
+          >
+            Create schema <ArrowRight className="w-3.5 h-3.5" />
           </button>
         }
       />
@@ -89,24 +102,39 @@ export function NewTemplateClient() {
               className="input"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Bag fee line"
+              placeholder="Price quote request"
               autoFocus
             />
+
             <label style={{ fontSize: 12, color: "var(--text-muted)" }}>id</label>
             <input
               className="input mono"
               style={{ fontFamily: "var(--font-mono)" }}
               value={computedId}
               onChange={(e) => { setId(e.target.value); setIdEdited(true); }}
-              placeholder="tmpl-bag-fee-line"
+              placeholder="schema-quote-request"
             />
+
+            <label style={{ fontSize: 12, color: "var(--text-muted)" }}>Intent</label>
+            <select
+              className="input"
+              value={intent ?? ""}
+              onChange={(e) => setIntent((e.target.value || undefined) as SchemaTemplate["intent"])}
+            >
+              <option value="input">Input — request shape rules consume</option>
+              <option value="context">Context — per-evaluation values</option>
+              <option value="output">Output — envelope-level response shape</option>
+              <option value="">Any / unspecified</option>
+            </select>
+
             <label style={{ fontSize: 12, color: "var(--text-muted)" }}>Category</label>
             <input
               className="input"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              placeholder="ancillary, tax, discount, …"
+              placeholder="passenger, booking, fare, …"
             />
+
             <label
               style={{
                 fontSize: 12,
@@ -123,7 +151,7 @@ export function NewTemplateClient() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
-              placeholder="What kind of object does this template describe?"
+              placeholder="What does this schema represent? Rules referencing this template will inherit the shape."
             />
           </section>
         </div>

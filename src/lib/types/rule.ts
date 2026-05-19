@@ -140,9 +140,31 @@ export type Rule = {
   tags?: string[];
   category?: string;
   projectId?: string;
+  /**
+   * The input-shape this rule consumes. By default the rule embeds its own
+   * literal schema. When `inputSchemaRef` is set, the editor resolves the
+   * referenced template at load time and uses its `schema` here; the on-disk
+   * rule.json stores ONLY the ref (no embedded inputSchema). At engine
+   * staging we inline the resolved schema before invoking the engine, so the
+   * .NET runtime always sees a plain rule with a literal schema — refs are
+   * an editor-side convenience, not an engine concept.
+   */
   inputSchema: JsonSchema;
   outputSchema: JsonSchema;
   contextSchema?: JsonSchema;
+  /**
+   * Optional id of a `SchemaTemplate` whose `.schema` supplies this rule's
+   * input shape. When set the editor uses the resolved schema as if it were
+   * inline. Edits to the template propagate to every referencing rule on
+   * next reload — no mass re-save needed.
+   *
+   * Pairs with outputSchemaRef / contextSchemaRef (future).
+   */
+  inputSchemaRef?: string;
+  /** Same as inputSchemaRef but for the output envelope (future). */
+  outputSchemaRef?: string;
+  /** Same as inputSchemaRef but for the per-evaluation context (future). */
+  contextSchemaRef?: string;
   /** DAG node-instances. NodeDef config lives in /nodes/[nodeId].json */
   instances: import("./node-def").RuleNodeInstance[];
   /** DAG edges between node-instances. */
@@ -156,7 +178,9 @@ export type Rule = {
 };
 
 /**
- * On-disk shape of /rules/[id]/rule.json — DAG only.
- * Schemas, bindings, and tests live in sibling subfolders.
+ * On-disk shape of /rules/[id]/rule.json — DAG + optional schema template
+ * refs only. Schemas (input/output/context), bindings, and tests live in
+ * sibling subfolders. Refs win over snapshots on read; snapshots remain on
+ * disk as a fallback if the referenced template is later deleted.
  */
 export type RuleOnDisk = Omit<Rule, "inputSchema" | "outputSchema" | "contextSchema" | "bindings" | "tests">;

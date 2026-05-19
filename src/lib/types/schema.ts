@@ -8,6 +8,7 @@ export type JsonSchemaPrimitive =
 export type JsonSchemaType = JsonSchemaPrimitive | "object" | "array";
 
 export type JsonSchema = {
+  $schema?: string;
   type?: JsonSchemaType | JsonSchemaType[];
   title?: string;
   description?: string;

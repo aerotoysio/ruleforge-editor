@@ -289,6 +289,8 @@ function labelForKind(k: PortBinding["kind"]): string {
     case "ref-select": return "From reference";
     case "date": return "Date";
     case "count-of": return "Count of";
+    case "markets-select": return "Markets";
+    case "template-fill": return "From template";
   }
 }
 

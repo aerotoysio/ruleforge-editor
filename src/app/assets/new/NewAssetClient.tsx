@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import type { Asset, OutputTemplate } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 
-import { Input } from "@/components/ui/Input";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { slugify } from "@/lib/slug";
 
@@ -85,7 +84,7 @@ export function NewAssetClient({ templates }: { templates: OutputTemplate[] }) {
             </Link>
           }
         />
-        <div className="flex-1 overflow-auto px-8 py-6 bg-muted/30">
+        <div className="flex-1 overflow-auto" style={{ background: "var(--bg)", padding: "24px 28px" }}>
           <EmptyState
             icon={<LayoutTemplate className="w-8 h-8" />}
             title="No templates yet"
@@ -117,14 +116,27 @@ export function NewAssetClient({ templates }: { templates: OutputTemplate[] }) {
           </button>
         }
       />
-      <div className="flex-1 overflow-auto px-8 py-6 bg-muted/30">
+      <div className="flex-1 overflow-auto" style={{ background: "var(--bg)", padding: "24px 28px" }}>
         <div className="max-w-2xl">
-          <section className="rounded-lg border bg-card shadow-sm p-5 grid grid-cols-[100px_1fr] gap-4 items-center">
-            <label className="text-[12px] text-muted-foreground">Template</label>
+          <section
+            style={{
+              background: "var(--panel)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-lg)",
+              boxShadow: "var(--shadow-sm)",
+              padding: 22,
+              display: "grid",
+              gridTemplateColumns: "120px 1fr",
+              columnGap: 16,
+              rowGap: 14,
+              alignItems: "center",
+            }}
+          >
+            <label style={{ fontSize: 12, color: "var(--text-muted)" }}>Template</label>
             <select
+              className="input"
               value={templateId}
               onChange={(e) => setTemplateId(e.target.value)}
-              className="h-9 text-[13px] px-2.5 rounded-md border border-input bg-background"
             >
               {templates.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -134,48 +146,60 @@ export function NewAssetClient({ templates }: { templates: OutputTemplate[] }) {
               ))}
             </select>
 
-            <label className="text-[12px] text-muted-foreground">Name</label>
-            <Input
+            <label style={{ fontSize: 12, color: "var(--text-muted)" }}>Name</label>
+            <input
+              className="input"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Extra bag — second checked"
-              className="h-9 text-[13px]"
               autoFocus
             />
 
-            <label className="text-[12px] text-muted-foreground">id</label>
-            <Input
+            <label style={{ fontSize: 12, color: "var(--text-muted)" }}>id</label>
+            <input
+              className="input mono"
+              style={{ fontFamily: "var(--font-mono)" }}
               value={computedId}
               onChange={(e) => { setId(e.target.value); setIdEdited(true); }}
-              className="h-9 text-[13px] font-mono"
               placeholder="asset-extra-bag-2"
             />
 
-            <label className="text-[12px] text-muted-foreground">Category</label>
-            <Input
+            <label style={{ fontSize: 12, color: "var(--text-muted)" }}>Category</label>
+            <input
+              className="input"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               placeholder="extra-bag, sports, oversize, …"
-              className="h-9 text-[13px]"
             />
 
-            <label className="text-[12px] text-muted-foreground self-start mt-1.5">Description</label>
+            <label
+              style={{
+                fontSize: 12,
+                color: "var(--text-muted)",
+                alignSelf: "flex-start",
+                marginTop: 6,
+              }}
+            >
+              Description
+            </label>
             <textarea
+              className="json-input"
+              style={{ fontFamily: "var(--font-sans)", fontSize: 12.5, minHeight: 56 }}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
               placeholder="Short business note — what this specific asset is."
-              className="text-[12.5px] leading-snug rounded-md border border-input bg-background px-3 py-1.5 outline-none focus:ring-2 focus:ring-foreground/20 resize-y min-h-[44px] max-h-[140px]"
             />
           </section>
 
           {template ? (
-            <p className="text-[11.5px] text-muted-foreground mt-3 px-1">
-              <strong className="font-medium text-foreground">{template.fields.length}</strong>{" "}
-              field{template.fields.length === 1 ? "" : "s"} from <em>{template.name}</em>.
+            <p style={{ fontSize: 11.5, color: "var(--text-muted)", marginTop: 12, padding: "0 4px" }}>
+              <strong style={{ fontWeight: 500, color: "var(--text)" }}>{template.fields.length}</strong>{" "}
+              field{template.fields.length === 1 ? "" : "s"} from{" "}
+              <em style={{ color: "var(--text)" }}>{template.name}</em>.{" "}
               Field values open for editing on the detail page after you create the asset.
               {Object.keys(seededValues).length > 0 ? (
-                <> {Object.keys(seededValues).length} field{Object.keys(seededValues).length === 1 ? " is" : "s are"} pre-filled from the template's defaults.</>
+                <> {Object.keys(seededValues).length} field{Object.keys(seededValues).length === 1 ? " is" : "s are"} pre-filled from the template&apos;s defaults.</>
               ) : null}
             </p>
           ) : null}

@@ -19,6 +19,9 @@ import {
   Users,
   Sun,
   Moon,
+  Braces,
+  Filter,
+  Terminal,
 } from "lucide-react";
 import { useWorkspace } from "./WorkspaceProvider";
 import { cn } from "@/lib/utils";
@@ -43,12 +46,15 @@ const ITEMS: Item[] = [
 
   // Data — what rules consume
   { href: "/nodes",      label: "Nodes",         icon: Boxes,           group: "data" },
+  { href: "/nodes?category=filter", label: "Filters", icon: Filter,     group: "data" },
+  { href: "/schemas",    label: "Schemas",       icon: Braces,          group: "data" },
   { href: "/templates",  label: "Templates",     icon: LayoutTemplate,  group: "data" },
   { href: "/assets",     label: "Assets",        icon: Package,         group: "data" },
   { href: "/references", label: "References",    icon: Database,        group: "data" },
   { href: "/samples",    label: "Samples",       icon: FlaskConical,    group: "data" },
 
   // Configure — system surface
+  { href: "/commands",     label: "Run commands", icon: Terminal,       group: "configure" },
   { href: "/integrations", label: "Integrations", icon: Plug,           group: "configure", disabled: true },
   { href: "/team",         label: "Team & roles", icon: Users,          group: "configure", disabled: true },
   { href: "/settings",     label: "Settings",     icon: Settings,       group: "configure" },
@@ -68,6 +74,62 @@ export function Sidebar() {
   const workspaceName = rootPath
     ? rootPath.split(/[\\/]/).filter(Boolean).pop() ?? "Workspace"
     : "Workspace";
+
+  // We read the live query string via window.location (refreshed when the URL
+  // changes via the popstate event + the pathname effect below). Using
+  // useSearchParams() here would force every page that renders this Sidebar
+  // through a Suspense boundary — too invasive when only this small "is
+  // active" check needs the query.
+  const [search, setSearch] = useState<string>("");
+  useEffect(() => {
+    setSearch(typeof window !== "undefined" ? window.location.search : "");
+    function onChange() {
+      setSearch(window.location.search);
+    }
+    window.addEventListener("popstate", onChange);
+    return () => window.removeEventListener("popstate", onChange);
+  }, [pathname]);
+  const searchParams = search ? new URLSearchParams(search.replace(/^\?/, "")) : null;
+
+  // Helper — does the current URL match a sidebar item's href?
+  // We compare pathname for normal links; for query-bearing hrefs (e.g.
+  // "/nodes?category=filter") we also have to match the query string. And
+  // when a query-bearing link is the "Filters" shortcut, the plain "/nodes"
+  // link should NOT light up — without that carve-out both would show
+  // active simultaneously when on /nodes?category=filter.
+  function isItemActive(item: Item): boolean {
+    const [itemPath, itemQuery] = item.href.split("?");
+    const pathMatches =
+      pathname === itemPath ||
+      (itemPath !== "/" && pathname?.startsWith(itemPath + "/"));
+    if (!pathMatches) return false;
+    if (itemQuery) {
+      // Query-bearing link: every key in the item's query must match the
+      // current URL's value.
+      const itemParams = new URLSearchParams(itemQuery);
+      for (const [k, v] of itemParams.entries()) {
+        if (searchParams?.get(k) !== v) return false;
+      }
+      return true;
+    }
+    // Plain link: only active when NO sibling query-bearing link wins. When
+    // a more-specific sibling claims the current URL, suppress this one so
+    // we don't get two active links at once.
+    if (searchParams && searchParams.toString().length > 0) {
+      for (const other of ITEMS) {
+        if (other === item || !other.href.startsWith(itemPath + "?")) continue;
+        const otherQuery = other.href.split("?")[1];
+        if (!otherQuery) continue;
+        const otherParams = new URLSearchParams(otherQuery);
+        let allMatch = true;
+        for (const [k, v] of otherParams.entries()) {
+          if (searchParams.get(k) !== v) { allMatch = false; break; }
+        }
+        if (allMatch) return false;
+      }
+    }
+    return true;
+  }
 
   return (
     <aside
@@ -159,9 +221,7 @@ export function Sidebar() {
                 {GROUP_LABELS[group]}
               </div>
               {items.map((item) => {
-                const active =
-                  pathname === item.href ||
-                  (item.href !== "/" && pathname?.startsWith(item.href + "/"));
+                const active = isItemActive(item);
                 const Icon = item.icon;
 
                 const content = (
@@ -255,19 +315,30 @@ export function Sidebar() {
 }
 
 function SidebarFooter() {
-  // The data-theme attribute is set on <html> at SSR. Drive a small client
-  // toggle that flips it. Persist to localStorage so a reload keeps the choice.
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  // The data-theme attribute is set on <html> at SSR to "light". The
+  // initial useState value MUST match — otherwise the toggle icon (Sun vs
+  // Moon) renders inconsistently with the actual theme, and the first
+  // click "fixes" nothing because internal state was already wrong. After
+  // mount, useEffect reads localStorage and syncs both.
+  const [theme, setTheme] = useState<"dark" | "light">("light");
 
   useEffect(() => {
     const saved = (typeof window !== "undefined" && localStorage.getItem("rf.theme")) as
       | "dark"
       | "light"
       | null;
-    if (saved) {
+    if (saved && saved !== theme) {
       setTheme(saved);
       document.documentElement.dataset.theme = saved;
+    } else {
+      // No saved preference — derive from whatever the layout set on <html>.
+      // Keeps the toggle icon in sync if the layout default changes.
+      const onHtml = document.documentElement.dataset.theme as "dark" | "light" | undefined;
+      if (onHtml && onHtml !== theme) setTheme(onHtml);
     }
+    // The effect only runs once; reading `theme` for the initial comparison
+    // is fine — we never re-run.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function flip() {

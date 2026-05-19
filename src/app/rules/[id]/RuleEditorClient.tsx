@@ -104,7 +104,7 @@ export function RuleEditorClient({ initial }: { initial: Rule }) {
       />
 
       {/* Tab strip */}
-      <div className="px-4 h-10 border-b bg-background shrink-0 flex items-center gap-1">
+      <div className="builder-tabs">
         {TABS.map((t) => {
           const Icon = t.icon;
           const isActive = t.id === tab;
@@ -112,20 +112,13 @@ export function RuleEditorClient({ initial }: { initial: Rule }) {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={cn(
-                "h-9 px-3 inline-flex items-center gap-1.5 text-[12.5px] font-medium border-b-2 -mb-px transition-colors",
-                isActive
-                  ? "border-foreground text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40",
-              )}
+              className={cn("builder-tab", isActive && "on")}
               title={t.description}
             >
               <Icon className="w-3.5 h-3.5" strokeWidth={isActive ? 2.1 : 1.8} />
               {t.label}
               {t.id === "tests" && initial.tests.length > 0 ? (
-                <span className="ml-0.5 text-[10px] tabular-nums px-1 h-4 inline-flex items-center rounded bg-muted text-muted-foreground">
-                  {initial.tests.length}
-                </span>
+                <span className="pill">{initial.tests.length}</span>
               ) : null}
             </button>
           );

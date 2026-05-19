@@ -95,31 +95,32 @@ export async function POST(req: NextRequest) {
   const root = await getActiveRoot();
   const settings = await readSettings();
   if (!root) return NextResponse.json({ error: "No workspace configured" }, { status: 409 });
-  if (!settings.engineCliPath) {
-    return NextResponse.json(
-      { error: "Engine CLI path not configured. Set it in Settings (path to the cloned ruleforge repo)." },
-      { status: 409 },
-    );
-  }
 
   const body = (await req.json()) as Body;
   const rule = await readRule(root, body.ruleId);
   if (!rule) return NextResponse.json({ error: "Rule not found" }, { status: 404 });
 
-  const cliProject = path.join(settings.engineCliPath, "src", "RuleForge.Cli");
-  try {
-    await fs.access(cliProject);
-  } catch {
-    return NextResponse.json(
-      { error: `RuleForge.Cli project not found at ${cliProject}. Check the engine CLI path.` },
-      { status: 400 },
-    );
-  }
+  // Two execution modes, picked automatically. HTTP mode is roughly 25× faster
+  // because the engine stays warm — no dotnet JIT, no fixture re-load, just
+  // loopback HTTP + microsecond NCalc eval. Falls back to CLI when no HTTP
+  // engine is reachable.
+  //
+  //   HTTP  — `engineUrl` set in Settings AND the engine is reachable.
+  //           Typical round-trip ≈ 3–8ms.
+  //   CLI   — spawn `dotnet run` against `engineCliPath`. Typical 80–150ms
+  //           (dotnet startup) regardless of how trivial the rule is.
+  //
+  // Compile-to-engine + stage-fixtures still runs on every CLI invocation
+  // because that's what the engine reads from disk. HTTP mode skips staging
+  // (the running engine watches its fixtures dir itself if started with
+  // `--watch`, OR consumes the same fixtures the editor stages — we still
+  // stage them as a safety net).
+  const wantHttp = !!settings.engineUrl;
+  const tStart = Date.now();
 
-  // Bridge the editor's per-rule directory layout into the flat fixture
-  // layout LocalFileRuleSource consumes. If THIS rule failed to compile,
-  // surface that error rather than handing the engine a missing fixture
-  // (which would just say "no rule bound to <endpoint>").
+  // Always stage so that BOTH modes have fresh engine-shaped JSON on disk —
+  // HTTP engines started with `--fixtures <staging>` will see the new rule
+  // when they re-read fixtures (either auto-watched or on-startup).
   const { fixturesDir, errors } = await stageEngineFixtures(root);
   const ruleCompileError = errors.find((e) => e.ruleId === body.ruleId);
   if (ruleCompileError) {
@@ -132,24 +133,80 @@ export async function POST(req: NextRequest) {
       { status: 422 },
     );
   }
+  const tStaged = Date.now();
+
+  if (wantHttp) {
+    // ── HTTP path ────────────────────────────────────────────────────────
+    const httpResult = await callEngineHttp(settings.engineUrl!, rule.method, rule.endpoint, body.payload);
+    const tEnd = Date.now();
+
+    if (httpResult.kind === "ok") {
+      return NextResponse.json({
+        envelope: httpResult.envelope,
+        stderr: null,
+        otherCompileErrors: errors,
+        timing: {
+          mode: "http",
+          totalMs: tEnd - tStart,
+          stageMs: tStaged - tStart,
+          engineMs: tEnd - tStaged,
+        },
+      });
+    }
+    // HTTP mode failed — only fall back to CLI if engineCliPath is configured.
+    // Otherwise surface the HTTP error directly so the user can fix it.
+    if (!settings.engineCliPath) {
+      return NextResponse.json(
+        {
+          error: "Engine HTTP call failed and no CLI fallback configured.",
+          detail: httpResult.detail,
+          mode: "http",
+          otherCompileErrors: errors,
+        },
+        { status: 502 },
+      );
+    }
+    // Fall through to CLI mode below — we'll annotate the timing with a
+    // `fallbackFromHttp` flag so the UI can tell the user their HTTP engine
+    // didn't answer.
+  }
+  // Track whether we just fell back from a failed HTTP attempt so the UI can
+  // surface "HTTP unreachable, used CLI" instead of pretending CLI was the
+  // intended path.
+  const fellBackFromHttp = wantHttp;
+
+  // ── CLI path (fallback or default when no engineUrl) ───────────────────
+  if (!settings.engineCliPath) {
+    return NextResponse.json(
+      {
+        error: "Neither Engine URL nor Engine CLI path configured. Set one in Settings — Engine URL for a running HTTP engine (~5ms per test), or Engine CLI path for spawn-per-test (~120ms).",
+      },
+      { status: 409 },
+    );
+  }
+
+  const cliProject = path.join(settings.engineCliPath, "src", "RuleForge.Cli");
+  try {
+    await fs.access(cliProject);
+  } catch {
+    return NextResponse.json(
+      { error: `RuleForge.Cli project not found at ${cliProject}. Check the engine CLI path.` },
+      { status: 400 },
+    );
+  }
 
   const args = [
-    "run",
-    "--no-build",
-    "--project",
-    cliProject,
+    "run", "--no-build", "--project", cliProject,
     "--",
     "run",
-    "--endpoint",
-    rule.endpoint,
-    "--request",
-    JSON.stringify(body.payload),
-    "--fixtures",
-    fixturesDir,
+    "--endpoint", rule.endpoint,
+    "--request", JSON.stringify(body.payload),
+    "--fixtures", fixturesDir,
     "--debug",
   ];
 
   const result = await spawnDotnet(args, settings.engineCliPath);
+  const tEnd = Date.now();
 
   const envelope = extractJson(result.stdout);
   if (!envelope) {
@@ -160,12 +217,60 @@ export async function POST(req: NextRequest) {
         stderr: result.stderr,
         code: result.code,
         otherCompileErrors: errors,
+        timing: { mode: "cli", totalMs: tEnd - tStart, stageMs: tStaged - tStart, engineMs: tEnd - tStaged },
       },
       { status: 502 },
     );
   }
 
-  return NextResponse.json({ envelope, stderr: result.stderr, otherCompileErrors: errors });
+  return NextResponse.json({
+    envelope,
+    stderr: result.stderr,
+    otherCompileErrors: errors,
+    timing: {
+      mode: "cli",
+      totalMs: tEnd - tStart,
+      stageMs: tStaged - tStart,
+      engineMs: tEnd - tStaged,
+      fellBackFromHttp,
+    },
+  });
+}
+
+/**
+ * Call the engine over HTTP. Tries `<engineUrl><endpoint>` first; if that 404s
+ * or fails we surface the detail so the caller can decide to fall back to CLI.
+ */
+async function callEngineHttp(
+  engineUrl: string,
+  method: string,
+  endpoint: string,
+  payload: unknown,
+): Promise<
+  | { kind: "ok"; envelope: unknown }
+  | { kind: "err"; detail: string }
+> {
+  const base = engineUrl.replace(/\/$/, "");
+  const url = `${base}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: { "content-type": "application/json" },
+      body: method.toUpperCase() === "GET" ? undefined : JSON.stringify(payload),
+      // Give a fast engine 2s to respond — anything slower means it's
+      // probably not running (or cold-starting itself), and we should
+      // surface that quickly so the caller can fall back to CLI.
+      signal: AbortSignal.timeout(2000),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      return { kind: "err", detail: `${res.status} ${res.statusText}: ${text.slice(0, 200)}` };
+    }
+    const envelope = await res.json();
+    return { kind: "ok", envelope };
+  } catch (err) {
+    return { kind: "err", detail: (err as Error).message };
+  }
 }
 
 async function spawnDotnet(args: string[], cwd: string): Promise<{ stdout: string; stderr: string; code: number }> {

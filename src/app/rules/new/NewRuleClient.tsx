@@ -7,8 +7,6 @@ import { ArrowRight, Sparkles } from "lucide-react";
 import type { JsonSchema, Rule } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
 
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
 import { slugify } from "@/lib/slug";
 
 const EMPTY_OBJECT_SCHEMA: JsonSchema = {
@@ -87,11 +85,21 @@ export function NewRuleClient() {
         eyebrow="Rules"
         description="Give your rule a name and an endpoint. You'll define its schema and wire up nodes in the editor."
       />
-      <div className="flex-1 overflow-auto bg-muted/30">
+      <div className="flex-1 overflow-auto" style={{ background: "var(--bg)" }}>
         <div className="max-w-2xl mx-auto px-8 py-8">
-          <div className="rounded-lg border bg-card shadow-sm p-6 flex flex-col gap-5">
+          <div
+            className="flex flex-col gap-5"
+            style={{
+              background: "var(--panel)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-lg)",
+              boxShadow: "var(--shadow-sm)",
+              padding: 22,
+            }}
+          >
             <FieldRow label="Name" hint="Human-readable. Shows in lists and the editor toolbar.">
-              <Input
+              <input
+                className="input"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Passenger validation — type vs DOB"
@@ -100,16 +108,18 @@ export function NewRuleClient() {
             </FieldRow>
 
             <FieldRow label="ID" hint="URL-safe slug. Used as the folder name on disk.">
-              <Input
+              <input
+                className="input mono"
+                style={{ fontFamily: "var(--font-mono)" }}
                 value={idEdited ? id : computedId}
                 onChange={(e) => { setId(e.target.value); setIdEdited(true); }}
                 placeholder="pax-validation"
-                className="font-mono"
               />
             </FieldRow>
 
             <FieldRow label="Description">
-              <Input
+              <input
+                className="input"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="What does this rule do? Optional but recommended."
@@ -118,31 +128,60 @@ export function NewRuleClient() {
 
             <div className="grid grid-cols-[100px_1fr] gap-3">
               <FieldRow label="Method">
-                <Select value={method} onChange={(e) => setMethod(e.target.value as "GET" | "POST")}>
+                <select
+                  className="input"
+                  value={method}
+                  onChange={(e) => setMethod(e.target.value as "GET" | "POST")}
+                >
                   <option value="POST">POST</option>
                   <option value="GET">GET</option>
-                </Select>
+                </select>
               </FieldRow>
               <FieldRow label="Endpoint" hint="Path the engine exposes — e.g. /v1/validate/passengers">
-                <Input
+                <input
+                  className="input mono"
+                  style={{ fontFamily: "var(--font-mono)" }}
                   value={endpoint}
                   onChange={(e) => setEndpoint(e.target.value)}
                   placeholder="/v1/your/endpoint"
-                  className="font-mono"
                 />
               </FieldRow>
             </div>
 
-            <div className="rounded-md border border-dashed bg-muted/30 px-3.5 py-3 flex items-start gap-2.5">
-              <Sparkles className="w-4 h-4 mt-0.5 text-muted-foreground shrink-0" />
-              <p className="text-[12px] text-muted-foreground leading-relaxed">
+            <div
+              style={{
+                border: "1px dashed var(--border)",
+                background: "var(--accent-soft)",
+                borderRadius: 7,
+                padding: "12px 14px",
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 10,
+              }}
+            >
+              <Sparkles
+                className="w-4 h-4 shrink-0"
+                style={{ marginTop: 2, color: "var(--accent)" }}
+              />
+              <p
+                style={{
+                  fontSize: 12,
+                  color: "var(--text-dim)",
+                  lineHeight: 1.5,
+                  margin: 0,
+                }}
+              >
                 The rule starts with empty input/output schemas and a minimal Input → Output graph.
-                Define your schema in the editor's <span className="font-medium text-foreground">Schema tab</span>,
+                Define your schema in the editor's{" "}
+                <span style={{ fontWeight: 500, color: "var(--text)" }}>Schema tab</span>,
                 then drag nodes from the right palette and bind their ports to your schema paths.
               </p>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t">
+            <div
+              className="flex justify-end gap-2"
+              style={{ paddingTop: 12, borderTop: "1px solid var(--border)" }}
+            >
               <button className="btn ghost sm" onClick={() => router.push("/rules")} disabled={busy}>
                 Cancel
               </button>
@@ -159,10 +198,10 @@ export function NewRuleClient() {
 
 function FieldRow({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1.5">
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <div className="flex items-baseline justify-between gap-2">
-        <label className="text-[12px] font-medium text-foreground">{label}</label>
-        {hint ? <span className="text-[10.5px] text-muted-foreground">{hint}</span> : null}
+        <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text)" }}>{label}</label>
+        {hint ? <span style={{ fontSize: 10.5, color: "var(--text-muted)" }}>{hint}</span> : null}
       </div>
       {children}
     </div>

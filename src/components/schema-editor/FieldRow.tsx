@@ -1,31 +1,35 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Trash2, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, X, Plus } from "lucide-react";
 import type { JsonSchema, JsonSchemaType } from "@/lib/types";
-import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
+
+/**
+ * Tree-row field editor for a JSON Schema property.
+ *
+ * Visual: one grid row per field, mirroring the table style used elsewhere
+ * (`.struct-rows`). Expanding the row reveals format/enum/min/max details
+ * inline; nested object/array fields recurse.
+ */
 
 const TYPES: JsonSchemaType[] = ["string", "number", "integer", "boolean", "object", "array", "null"];
 
-/**
- * The user-facing type picker. We expand the JSON Schema type set with a few
- * common "string with format" pseudo-types — date / date-time / email — so
- * authors don't have to know that a date is "string + format=date" under the
- * hood. The schema written to disk is still a real JSON Schema fragment.
- */
+// User-facing type picker. We expand the JSON Schema type set with a few
+// common "string with format" pseudo-types — date / date-time / email — so
+// authors don't have to know that a date is "string + format=date" under
+// the hood. The schema written to disk is still a real JSON Schema fragment.
 type PickType = JsonSchemaType | "date" | "date-time" | "email";
 
 const PICK_TYPES: { value: PickType; label: string }[] = [
-  { value: "string",     label: "text"     },
-  { value: "number",     label: "number"   },
-  { value: "integer",    label: "integer"  },
-  { value: "boolean",    label: "yes / no" },
-  { value: "date",       label: "date"     },
-  { value: "date-time",  label: "date-time"},
-  { value: "email",      label: "email"    },
-  { value: "object",     label: "object"   },
-  { value: "array",      label: "list"     },
+  { value: "string",    label: "text" },
+  { value: "number",    label: "number" },
+  { value: "integer",   label: "integer" },
+  { value: "boolean",   label: "yes / no" },
+  { value: "date",      label: "date" },
+  { value: "date-time", label: "date-time" },
+  { value: "email",     label: "email" },
+  { value: "object",    label: "object" },
+  { value: "array",     label: "list" },
 ];
 
 function schemaForPickType(t: PickType): JsonSchema {
@@ -59,66 +63,130 @@ type Props = {
 export function FieldRow({ name, schema, required, depth, onRename, onChange, onDelete, onToggleRequired }: Props) {
   const [open, setOpen] = useState(false);
   const type = pickType(schema);
-  const userType = detectPickType(schema);
   const hasNested = type === "object" || type === "array";
+  const userType = detectPickType(schema);
 
   return (
     <div
-      className="flex flex-col"
       style={{
-        marginLeft: depth * 14,
-        borderLeft: depth > 0 ? "1px dashed var(--color-border-strong)" : undefined,
+        marginLeft: depth * 16,
+        borderLeft: depth > 0 ? "1px dashed var(--border-strong)" : undefined,
         paddingLeft: depth > 0 ? 10 : 0,
       }}
     >
-      <div className="grid grid-cols-[auto_2fr_1.2fr_auto_auto] gap-2 items-center py-1.5">
+      <div
+        className="grid items-center"
+        style={{
+          gridTemplateColumns: "28px 2fr 1.2fr 56px 28px",
+          gap: 8,
+          padding: "6px 0",
+          borderBottom: "1px solid var(--border)",
+        }}
+      >
         <button
+          type="button"
           onClick={() => hasNested && setOpen(!open)}
-          className="w-5 h-5 flex items-center justify-center rounded"
-          style={{ visibility: hasNested ? "visible" : "hidden", color: "var(--color-fg-muted)" }}
+          style={{
+            width: 22,
+            height: 22,
+            display: "inline-grid",
+            placeItems: "center",
+            borderRadius: 4,
+            background: "transparent",
+            border: 0,
+            cursor: hasNested ? "pointer" : "default",
+            color: "var(--text-muted)",
+            visibility: hasNested ? "visible" : "hidden",
+          }}
+          aria-label={open ? "Collapse" : "Expand"}
         >
           {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
         </button>
-        <Input
+        <input
+          className="input mono"
+          style={{ fontFamily: "var(--font-mono)", height: 28, fontSize: 12 }}
           value={name}
           onChange={(e) => onRename(e.target.value)}
           placeholder="fieldName"
-          className="mono"
         />
-        <Select
+        <select
+          className="input"
+          style={{ height: 28, fontSize: 12 }}
           value={userType}
           onChange={(e) => onChange(retypePickSchema(schema, e.target.value as PickType))}
         >
           {PICK_TYPES.map((t) => (
             <option key={t.value} value={t.value}>{t.label}</option>
           ))}
-        </Select>
-        <label className="text-[11px] flex items-center gap-1.5 select-none cursor-pointer" title="Toggle required">
-          <input type="checkbox" checked={required} onChange={onToggleRequired} className="cursor-pointer" />
-          <span style={{ color: "var(--color-fg-muted)" }}>req</span>
+        </select>
+        <label
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 5,
+            fontSize: 10.5,
+            color: "var(--text-muted)",
+            cursor: "pointer",
+            userSelect: "none",
+            justifyContent: "center",
+          }}
+          title="Required field"
+        >
+          <input
+            type="checkbox"
+            checked={required}
+            onChange={onToggleRequired}
+            style={{ cursor: "pointer" }}
+          />
+          req
         </label>
         <button
+          type="button"
           onClick={onDelete}
-          className="w-7 h-7 flex items-center justify-center rounded"
-          style={{ color: "var(--color-fg-muted)" }}
+          className="x"
+          style={{
+            width: 22,
+            height: 22,
+            display: "inline-grid",
+            placeItems: "center",
+            borderRadius: 4,
+            background: "transparent",
+            border: 0,
+            color: "var(--text-muted)",
+            cursor: "pointer",
+          }}
           title="Remove field"
+          aria-label="Remove field"
         >
-          <Trash2 className="w-3.5 h-3.5" />
+          <X className="w-3.5 h-3.5" />
         </button>
       </div>
 
       {open ? (
-        <div className="ml-7 mb-2 flex flex-col gap-1.5">
+        <div
+          style={{
+            marginLeft: 30,
+            padding: "10px 12px 10px 0",
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+          }}
+        >
           <DetailsRow label="description">
-            <Input
+            <input
+              className="input"
+              style={{ height: 28, fontSize: 12 }}
               value={schema.description ?? ""}
               onChange={(e) => onChange({ ...schema, description: e.target.value || undefined })}
+              placeholder="What does this field represent?"
             />
           </DetailsRow>
           {type === "string" ? (
             <>
               <DetailsRow label="format">
-                <Select
+                <select
+                  className="input"
+                  style={{ height: 28, fontSize: 12 }}
                   value={schema.format ?? ""}
                   onChange={(e) => onChange({ ...schema, format: e.target.value || undefined })}
                 >
@@ -128,10 +196,12 @@ export function FieldRow({ name, schema, required, depth, onRename, onChange, on
                   <option value="email">email</option>
                   <option value="uri">uri</option>
                   <option value="uuid">uuid</option>
-                </Select>
+                </select>
               </DetailsRow>
               <DetailsRow label="enum (csv)">
-                <Input
+                <input
+                  className="input"
+                  style={{ height: 28, fontSize: 12 }}
                   value={(schema.enum ?? []).join(", ")}
                   onChange={(e) =>
                     onChange({
@@ -142,21 +212,26 @@ export function FieldRow({ name, schema, required, depth, onRename, onChange, on
                         .filter(Boolean),
                     })
                   }
+                  placeholder="ADT, CHD, INF"
                 />
               </DetailsRow>
             </>
           ) : null}
-          {type === "number" || type === "integer" ? (
+          {(type === "number" || type === "integer") ? (
             <>
               <DetailsRow label="min">
-                <Input
+                <input
+                  className="input"
+                  style={{ height: 28, fontSize: 12 }}
                   type="number"
                   value={schema.minimum ?? ""}
                   onChange={(e) => onChange({ ...schema, minimum: e.target.value === "" ? undefined : Number(e.target.value) })}
                 />
               </DetailsRow>
               <DetailsRow label="max">
-                <Input
+                <input
+                  className="input"
+                  style={{ height: 28, fontSize: 12 }}
                   type="number"
                   value={schema.maximum ?? ""}
                   onChange={(e) => onChange({ ...schema, maximum: e.target.value === "" ? undefined : Number(e.target.value) })}
@@ -168,19 +243,11 @@ export function FieldRow({ name, schema, required, depth, onRename, onChange, on
       ) : null}
 
       {open && type === "object" ? (
-        <NestedObject
-          schema={schema}
-          depth={depth + 1}
-          onChange={onChange}
-        />
+        <NestedObject schema={schema} depth={depth + 1} onChange={onChange} />
       ) : null}
 
       {open && type === "array" ? (
-        <NestedArray
-          schema={schema}
-          depth={depth + 1}
-          onChange={onChange}
-        />
+        <NestedArray schema={schema} depth={depth + 1} onChange={onChange} />
       ) : null}
     </div>
   );
@@ -188,8 +255,11 @@ export function FieldRow({ name, schema, required, depth, onRename, onChange, on
 
 function DetailsRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[80px_1fr] gap-2 items-center text-[12px]">
-      <label style={{ color: "var(--color-fg-muted)" }}>{label}</label>
+    <div
+      className="grid items-center"
+      style={{ gridTemplateColumns: "80px 1fr", gap: 10, fontSize: 11.5 }}
+    >
+      <label style={{ color: "var(--text-muted)" }}>{label}</label>
       {children}
     </div>
   );
@@ -251,8 +321,25 @@ function NestedObject({ schema, depth, onChange }: { schema: JsonSchema; depth: 
 function NestedArray({ schema, depth, onChange }: { schema: JsonSchema; depth: number; onChange: (next: JsonSchema) => void }) {
   const items = schema.items ?? { type: "string" };
   return (
-    <div className="flex flex-col" style={{ marginLeft: depth * 14, borderLeft: "1px dashed var(--color-border-strong)", paddingLeft: 10 }}>
-      <div className="text-[11px] py-1" style={{ color: "var(--color-fg-muted)" }}>items</div>
+    <div
+      style={{
+        marginLeft: depth * 16,
+        borderLeft: "1px dashed var(--border-strong)",
+        paddingLeft: 10,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 10,
+          fontWeight: 600,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          color: "var(--text-muted)",
+          padding: "8px 0 4px",
+        }}
+      >
+        items
+      </div>
       <FieldRow
         name="(items)"
         schema={items}
@@ -273,9 +360,25 @@ export function AddField({ existingKeys, depth, onAdd }: { existingKeys: string[
   const taken = existingKeys.includes(name);
   const disabled = !name.trim() || taken;
   return (
-    <div className="grid grid-cols-[auto_2fr_1.2fr_auto] gap-2 items-center py-1.5" style={{ marginLeft: depth * 14 + 27 }}>
-      <span className="w-1" />
-      <Input
+    <div
+      className="grid items-center"
+      style={{
+        gridTemplateColumns: "28px 2fr 1.2fr 28px",
+        gap: 8,
+        padding: "8px 0",
+        marginLeft: depth * 16,
+      }}
+    >
+      <span />
+      <input
+        className="input mono"
+        style={{
+          fontFamily: "var(--font-mono)",
+          height: 28,
+          fontSize: 12,
+          borderStyle: taken ? "solid" : "dashed",
+          borderColor: taken ? "var(--danger)" : "var(--border)",
+        }}
         value={name}
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => {
@@ -284,19 +387,41 @@ export function AddField({ existingKeys, depth, onAdd }: { existingKeys: string[
             setName("");
           }
         }}
-        placeholder="add field…"
-        invalid={taken}
+        placeholder="+ add field…"
       />
-      <Select value={type} onChange={(e) => setType(e.target.value as PickType)}>
-        {PICK_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-      </Select>
-      <button
-        onClick={() => { if (!disabled) { onAdd(name.trim(), schemaForPickType(type)); setName(""); } }}
-        disabled={disabled}
-        className="w-7 h-7 flex items-center justify-center rounded disabled:opacity-30"
-        style={{ color: "var(--color-fg)", border: "1px solid var(--color-border-strong)" }}
+      <select
+        className="input"
+        style={{ height: 28, fontSize: 12 }}
+        value={type}
+        onChange={(e) => setType(e.target.value as PickType)}
       >
-        <Plus className="w-3.5 h-3.5" />
+        {PICK_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+      </select>
+      <button
+        type="button"
+        onClick={() => {
+          if (!disabled) {
+            onAdd(name.trim(), schemaForPickType(type));
+            setName("");
+          }
+        }}
+        disabled={disabled}
+        style={{
+          width: 22,
+          height: 22,
+          display: "inline-grid",
+          placeItems: "center",
+          borderRadius: 4,
+          background: disabled ? "transparent" : "var(--accent)",
+          color: disabled ? "var(--text-faint)" : "var(--accent-fg)",
+          border: "1px solid",
+          borderColor: disabled ? "var(--border)" : "var(--accent)",
+          cursor: disabled ? "not-allowed" : "pointer",
+        }}
+        title="Add field"
+        aria-label="Add field"
+      >
+        <Plus className="w-3 h-3" />
       </button>
     </div>
   );
@@ -307,14 +432,6 @@ function pickType(schema: JsonSchema): JsonSchemaType | undefined {
   return schema.type;
 }
 
-function retypeSchema(prev: JsonSchema, t: JsonSchemaType): JsonSchema {
-  const next: JsonSchema = { type: t };
-  if (prev.description) next.description = prev.description;
-  if (t === "object") next.properties = prev.properties ?? {};
-  if (t === "array") next.items = prev.items ?? { type: "string" };
-  return next;
-}
-
 function retypePickSchema(prev: JsonSchema, t: PickType): JsonSchema {
   const next = schemaForPickType(t);
   if (prev.description) next.description = prev.description;
@@ -322,3 +439,6 @@ function retypePickSchema(prev: JsonSchema, t: PickType): JsonSchema {
   if (t === "array") next.items = prev.items ?? { type: "string" };
   return next;
 }
+
+// Re-export so SchemaEditor's TYPES list is the same source of truth.
+export { TYPES, PICK_TYPES };

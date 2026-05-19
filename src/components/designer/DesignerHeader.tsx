@@ -7,21 +7,22 @@ type Props = {
 
 export function DesignerHeader({ title, subtitle, badge, accent = "#64748b" }: Props) {
   return (
-    <header className="px-4 py-3 border-b shrink-0 flex items-center gap-2.5 bg-card">
+    <header className="popup-head" style={{ paddingRight: 20 }}>
       {badge ? (
-        <span
-          className="inline-flex items-center justify-center w-9 h-9 rounded-md text-[10px] font-bold font-mono tracking-wide"
-          style={{ background: accent, color: "#fff" }}
-        >
+        <span className="badge" style={{ background: accent }}>
           {badge}
         </span>
       ) : null}
-      <div className="min-w-0 flex flex-col leading-tight">
-        <span className="text-[14px] font-semibold tracking-tight text-foreground truncate" title={title}>
+      <div className="min-w-0 flex-1">
+        <span className="title block truncate" title={title}>
           {title}
         </span>
         {subtitle ? (
-          <span className="text-[11px] font-mono text-muted-foreground truncate" title={subtitle}>
+          <span
+            className="subtitle mono block"
+            style={{ fontFamily: "var(--font-mono)" }}
+            title={subtitle}
+          >
             {subtitle}
           </span>
         ) : null}

@@ -44,9 +44,19 @@ export function SettingsSheet({ mode, onClose }: Props) {
         </div>
 
         <div
-          className="px-4 py-2 text-[11px] border-t shrink-0 flex items-center justify-between text-muted-foreground bg-muted/30"
+          className="shrink-0 flex items-center justify-between"
+          style={{
+            padding: "10px 18px",
+            fontSize: 11,
+            color: "var(--text-muted)",
+            background: "var(--panel-2)",
+            borderTop: "1px solid var(--border)",
+          }}
         >
-          <span>Edits apply immediately. Use the toolbar Save to persist to disk.</span>
+          <span>
+            Edits apply immediately. Use the toolbar{" "}
+            <strong style={{ color: "var(--text)" }}>Save</strong> to persist to disk.
+          </span>
         </div>
       </SheetContent>
     </Sheet>

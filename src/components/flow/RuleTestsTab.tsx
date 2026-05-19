@@ -45,7 +45,7 @@ export function RuleTestsTab({ onRunTest }: Props) {
   }
 
   function deleteActive() {
-    if (!active) return;
+    if (!active || !rule) return;
     if (!confirm(`Delete test "${active.name}"?`)) return;
     removeTest(active.id);
     const remaining = rule.tests.filter((t) => t.id !== active.id);

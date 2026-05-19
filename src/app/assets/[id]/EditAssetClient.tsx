@@ -7,7 +7,6 @@ import { ArrowLeft, Save, Trash2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import type { Asset, OutputTemplate, OutputTemplateField } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { Input } from "@/components/ui/Input";
 
 type Props = {
   initialAsset: Asset;
@@ -92,83 +91,143 @@ export function EditAssetClient({ initialAsset, templates }: Props) {
           </div>
         }
       />
-      <div className="flex-1 overflow-auto px-8 py-6 bg-muted/30">
+      <div className="flex-1 overflow-auto" style={{ background: "var(--bg)", padding: "24px 28px" }}>
         <div className="max-w-3xl flex flex-col gap-6">
           {!template ? (
-            <div className="rounded-md border border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-900 px-4 py-3 flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-700 dark:text-amber-400 mt-0.5 shrink-0" />
-              <div className="text-[12px] text-amber-900 dark:text-amber-200">
+            <div
+              style={{
+                border: "1px solid var(--warn-soft)",
+                background: "var(--warn-soft)",
+                borderRadius: 8,
+                padding: "12px 14px",
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 10,
+              }}
+            >
+              <AlertTriangle
+                className="w-4 h-4 shrink-0"
+                style={{ color: "var(--warn)", marginTop: 2 }}
+              />
+              <div style={{ fontSize: 12, color: "var(--warn)", lineHeight: 1.5 }}>
                 <strong>Template missing.</strong> This asset references{" "}
-                <code className="font-mono">{asset.templateId}</code>, which isn&apos;t in this workspace. Re-create
+                <code style={{ fontFamily: "var(--font-mono)" }}>{asset.templateId}</code>, which isn&apos;t in this workspace. Re-create
                 the template or change this asset&apos;s templateId before using it from a rule.
               </div>
             </div>
           ) : null}
 
           {/* Identity */}
-          <section className="rounded-lg border bg-card shadow-sm">
-            <header className="px-4 py-2.5 border-b bg-muted/40">
-              <h2 className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground/80 font-semibold">
-                Identity
-              </h2>
+          <section
+            style={{
+              background: "var(--panel)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-lg)",
+              boxShadow: "var(--shadow-sm)",
+              overflow: "hidden",
+            }}
+          >
+            <header
+              style={{
+                padding: "12px 18px",
+                borderBottom: "1px solid var(--border)",
+                background: "var(--panel-2)",
+              }}
+            >
+              <h2 className="field-label" style={{ margin: 0 }}>Identity</h2>
             </header>
-            <div className="grid grid-cols-[100px_1fr] gap-3 items-center px-4 py-4">
-              <label className="text-[12px] text-muted-foreground">id</label>
-              <code className="text-[12px] font-mono text-muted-foreground">{asset.id}</code>
-              <label className="text-[12px] text-muted-foreground">Template</label>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "120px 1fr",
+                columnGap: 16,
+                rowGap: 12,
+                alignItems: "center",
+                padding: "18px 20px",
+              }}
+            >
+              <label style={{ fontSize: 12, color: "var(--text-muted)" }}>id</label>
+              <code style={{ fontSize: 12, fontFamily: "var(--font-mono)", color: "var(--text-muted)" }}>
+                {asset.id}
+              </code>
+              <label style={{ fontSize: 12, color: "var(--text-muted)" }}>Template</label>
               {template ? (
                 <Link
                   href={`/templates/${encodeURIComponent(template.id)}`}
-                  className="text-[12.5px] hover:underline text-foreground"
+                  style={{ fontSize: 12.5, color: "var(--text)" }}
+                  className="hover:underline"
                 >
                   {template.name}{" "}
-                  <span className="font-mono text-muted-foreground/70 text-[11px]">
+                  <span style={{ fontFamily: "var(--font-mono)", color: "var(--text-muted)", fontSize: 11 }}>
                     · {template.id}
                   </span>
                 </Link>
               ) : (
-                <code className="text-[12px] font-mono text-amber-700">{asset.templateId}</code>
+                <code style={{ fontSize: 12, fontFamily: "var(--font-mono)", color: "var(--warn)" }}>
+                  {asset.templateId}
+                </code>
               )}
-              <label className="text-[12px] text-muted-foreground">Name</label>
-              <Input
+              <label style={{ fontSize: 12, color: "var(--text-muted)" }}>Name</label>
+              <input
+                className="input"
                 value={asset.name ?? ""}
                 onChange={(e) => patch("name", e.target.value || undefined)}
                 placeholder={asset.id}
-                className="h-8 text-[13px]"
               />
-              <label className="text-[12px] text-muted-foreground">Category</label>
-              <Input
+              <label style={{ fontSize: 12, color: "var(--text-muted)" }}>Category</label>
+              <input
+                className="input"
                 value={asset.category ?? ""}
                 onChange={(e) => patch("category", e.target.value || undefined)}
                 placeholder="optional grouping (extra-bag, sports, …)"
-                className="h-8 text-[13px]"
               />
-              <label className="text-[12px] text-muted-foreground self-start mt-1.5">Description</label>
+              <label style={{ fontSize: 12, color: "var(--text-muted)", alignSelf: "flex-start", marginTop: 6 }}>
+                Description
+              </label>
               <textarea
+                className="json-input"
+                style={{ fontFamily: "var(--font-sans)", fontSize: 12.5, minHeight: 52 }}
                 value={asset.description ?? ""}
                 onChange={(e) => patch("description", e.target.value || undefined)}
                 rows={2}
-                className="text-[12.5px] leading-snug rounded-md border border-input bg-background px-3 py-1.5 outline-none focus:ring-2 focus:ring-foreground/20 resize-y min-h-[44px] max-h-[120px]"
               />
             </div>
           </section>
 
           {/* Values */}
-          <section className="rounded-lg border bg-card shadow-sm">
-            <header className="px-4 py-2.5 border-b bg-muted/40">
-              <h2 className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground/80 font-semibold">
-                Values
-              </h2>
+          <section
+            style={{
+              background: "var(--panel)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-lg)",
+              boxShadow: "var(--shadow-sm)",
+              overflow: "hidden",
+            }}
+          >
+            <header
+              style={{
+                padding: "12px 18px",
+                borderBottom: "1px solid var(--border)",
+                background: "var(--panel-2)",
+              }}
+            >
+              <h2 className="field-label" style={{ margin: 0 }}>Values</h2>
             </header>
-            <div className="divide-y">
+            <div style={{ display: "flex", flexDirection: "column" }}>
               {template ? (
-                template.fields.map((field) => (
-                  <FieldRow
+                template.fields.map((field, i) => (
+                  <div
                     key={field.name}
-                    field={field}
-                    value={asset.values[field.name]}
-                    onChange={(v) => patchValue(field.name, v)}
-                  />
+                    style={{
+                      borderTop: i === 0 ? "0" : "1px solid var(--border)",
+                    }}
+                  >
+                    <FieldRow
+                      field={field}
+                      value={asset.values[field.name]}
+                      onChange={(v) => patchValue(field.name, v)}
+                    />
+                  </div>
                 ))
               ) : (
                 <FreeFormJsonEditor
@@ -194,21 +253,47 @@ function FieldRow({
   onChange: (v: unknown) => void;
 }) {
   return (
-    <div className="grid grid-cols-[200px_1fr] gap-3 px-4 py-3 items-start">
-      <div className="flex flex-col gap-0.5 pt-1.5 min-w-0">
-        <div className="flex items-center gap-1.5">
-          <span className="text-[12.5px] font-mono font-medium text-foreground truncate" title={field.name}>
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "220px 1fr",
+        gap: 16,
+        padding: "14px 20px",
+        alignItems: "flex-start",
+      }}
+    >
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, paddingTop: 6, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span
+            style={{
+              fontSize: 12.5,
+              fontFamily: "var(--font-mono)",
+              fontWeight: 500,
+              color: "var(--text)",
+            }}
+            className="truncate"
+            title={field.name}
+          >
             {field.name}
           </span>
-          {field.required ? (
-            <span className="req-pill">
-              req
-            </span>
-          ) : null}
+          {field.required ? <span className="req-pill">req</span> : null}
         </div>
-        <span className="text-[10.5px] text-muted-foreground font-mono">{field.type}</span>
+        <span style={{ fontSize: 10.5, fontFamily: "var(--font-mono)", color: "var(--text-muted)" }}>
+          {field.type}
+        </span>
         {field.description ? (
-          <span className="text-[10.5px] text-muted-foreground/80 leading-snug mt-0.5 line-clamp-3">
+          <span
+            style={{
+              fontSize: 10.5,
+              color: "var(--text-muted)",
+              lineHeight: 1.4,
+              marginTop: 2,
+              display: "-webkit-box",
+              WebkitLineClamp: 3,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }}
+          >
             {field.description}
           </span>
         ) : null}
@@ -229,15 +314,13 @@ function ValueInput({
 }) {
   if (field.type === "boolean") {
     return (
-      <div className="flex gap-1.5">
+      <div className="pill-toggle">
         {[true, false].map((opt) => (
           <button
             key={String(opt)}
             type="button"
             onClick={() => onChange(opt)}
-            className={`h-8 px-3 text-[12px] font-medium rounded-md border transition-colors ${
-              value === opt ? "bg-foreground text-background border-foreground" : "bg-card border-border hover:border-foreground/30"
-            }`}
+            className={value === opt ? "on" : ""}
           >
             {opt ? "Yes" : "No"}
           </button>
@@ -247,12 +330,13 @@ function ValueInput({
   }
   if (field.type === "number" || field.type === "integer") {
     return (
-      <Input
+      <input
+        className="input"
+        style={{ maxWidth: 260 }}
         type="number"
         value={typeof value === "number" ? value : ""}
         onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
         placeholder={field.examples?.[0] != null ? String(field.examples[0]) : "0"}
-        className="h-8 text-[12.5px] max-w-[260px]"
       />
     );
   }
@@ -260,6 +344,7 @@ function ValueInput({
     const arr = Array.isArray(value) ? (value as Array<string | number>).join("\n") : "";
     return (
       <textarea
+        className="json-input"
         rows={3}
         value={arr}
         onChange={(e) => {
@@ -267,13 +352,13 @@ function ValueInput({
           onChange(field.type === "number-array" ? items.map(Number) : items);
         }}
         placeholder="one value per line"
-        className="text-[12px] font-mono px-2.5 py-1.5 rounded-md border border-border bg-background outline-none focus:ring-2 focus:ring-foreground/30"
       />
     );
   }
   if (field.type === "object" || field.type === "object-array" || field.type === "any") {
     return (
       <textarea
+        className="json-input"
         rows={4}
         value={value == null ? "" : typeof value === "string" ? value : JSON.stringify(value, null, 2)}
         onChange={(e) => {
@@ -284,12 +369,12 @@ function ValueInput({
           }
         }}
         placeholder='{ "foo": "bar" }'
-        className="text-[12px] font-mono px-2.5 py-1.5 rounded-md border border-border bg-background outline-none focus:ring-2 focus:ring-foreground/30"
       />
     );
   }
   return (
-    <Input
+    <input
+      className="input"
       value={typeof value === "string" ? value : value != null ? String(value) : ""}
       onChange={(e) => onChange(e.target.value)}
       placeholder={
@@ -299,7 +384,6 @@ function ValueInput({
           ? String(field.default)
           : ""
       }
-      className="h-8 text-[12.5px]"
     />
   );
 }
@@ -314,8 +398,9 @@ function FreeFormJsonEditor({
   const [text, setText] = useState(() => JSON.stringify(value, null, 2));
   const [error, setError] = useState<string | null>(null);
   return (
-    <div className="px-4 py-4 flex flex-col gap-2">
+    <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: 20 }}>
       <textarea
+        className="json-input"
         value={text}
         onChange={(e) => {
           setText(e.target.value);
@@ -327,10 +412,9 @@ function FreeFormJsonEditor({
           }
         }}
         rows={12}
-        className="text-[12px] font-mono px-2.5 py-1.5 rounded-md border border-border bg-background outline-none focus:ring-2 focus:ring-foreground/30"
       />
       {error ? (
-        <span className="text-[11px] text-amber-700 dark:text-amber-400">{error}</span>
+        <span style={{ fontSize: 11, color: "var(--warn)" }}>{error}</span>
       ) : null}
     </div>
   );

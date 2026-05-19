@@ -3,8 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Check, Wand2, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/Input";
 import { useRuleStore } from "@/lib/store/rule-store";
 import { useNodesStore } from "@/lib/store/nodes-store";
 import { useReferencesStore } from "@/lib/store/references-store";
@@ -24,15 +22,15 @@ type Props = {
 
 /**
  * Single popup that configures an entire filter node — all ports inline as
- * form sections, one Save commits everything. Replaces the per-port
- * BindingPickerDialog for filter nodes.
+ * form sections, one Save commits everything.
  *
- *   Section 1: "Field to test"      — source port (path picker)
- *   Section 2: "Values" (or similar) — literal / match port
- *   Section 3: "Advanced" (collapsed) — onMissing, arraySelector, etc.
+ *   Section 1: Identity              — label + description (per-instance)
+ *   Section 2: Primary ports         — visible by default
+ *   Section 3: Advanced (collapsed)  — onMissing / caseInsensitive / trim
  *
- * For non-filter nodes we'd compose the same way, just labelled differently
- * — for now this is filter-only.
+ * Styled with the design's popup vocabulary (`.popup-head`, `.popup-body`,
+ * `.popup-foot`, `.field-group`, `.field-label`, …). See globals.css for
+ * the source-of-truth styling — keep tweaks there, not inline.
  */
 export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
   const rule = useRuleStore((s) => s.rule);
@@ -65,9 +63,8 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
   if (!rule || !instance || !def) return null;
 
   // Categorise ports: primary (visible by default) vs advanced (collapsed).
-  // arraySelector is a primary business choice ("any pax is gold" vs "every
-  // pax is gold" vs "no pax is gold") — not advanced. caseInsensitive / trim /
-  // onMissing are recovery / formatting toggles, hide them by default.
+  // arraySelector is a primary business choice — not advanced. caseInsensitive
+  // / trim / onMissing are recovery / formatting toggles, hide them by default.
   const ADVANCED_NAMES = new Set(["onMissing", "caseInsensitive", "trim"]);
   const allPorts = [...(def.ports.inputs ?? []), ...(def.ports.params ?? [])];
   const primary = allPorts.filter((p) => !ADVANCED_NAMES.has(p.name));
@@ -83,15 +80,12 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
   }
 
   function commit() {
-    // Persist bindings
     setNodeBindings(instanceId, {
       instanceId,
       ruleId: rule!.id,
       bindings: draft,
       extras: initialBindings?.extras,
     });
-    // Persist label/description on the instance. Trim and treat empty as
-    // "unset" — that way a wiped field falls back to def.name on display.
     const trimmedLabel = labelDraft.trim();
     const trimmedDesc = descriptionDraft.trim();
     if ((instance!.label ?? "") !== trimmedLabel || (instance!.description ?? "") !== trimmedDesc) {
@@ -124,67 +118,61 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) tryClose(); }}>
-      <DialogContent className="max-w-[900px] sm:max-w-[900px] p-0 gap-0 flex flex-col h-[640px]">
-        {/* Header */}
-        <header className="px-5 pr-12 py-3 border-b shrink-0 flex items-center gap-3 bg-card">
-          <span
-            className="inline-flex items-center justify-center w-8 h-8 rounded-md text-[10px] font-bold font-mono tracking-wide shrink-0"
-            style={{ background: accent, color: "#fff" }}
-          >
+      <DialogContent
+        className="max-w-[920px] sm:max-w-[920px] p-0 gap-0 flex flex-col h-[660px] overflow-hidden"
+        style={{ background: "var(--panel)" }}
+      >
+        <header className="popup-head">
+          <span className="badge" style={{ background: accent }}>
             {badge}
           </span>
-          <div className="flex flex-col leading-tight min-w-0 flex-1">
-            <DialogTitle className="text-[15px] font-semibold tracking-tight text-foreground">
+          <div className="min-w-0 flex-1">
+            <DialogTitle className="title">
               {instance.label ?? def.name}
             </DialogTitle>
-            <DialogDescription className="text-[12px] text-muted-foreground mt-0.5 max-w-prose line-clamp-2">
+            <DialogDescription className="subtitle">
               {def.description ?? `Configure this ${def.category} node.`}
             </DialogDescription>
           </div>
         </header>
 
-        {/* Body — sections per port. For nodes with no configurable ports
-            (rare — terminals, simple merge), show a friendly empty state. */}
-        <div className="flex-1 overflow-auto px-6 py-5 flex flex-col gap-5">
+        <div className="popup-body">
           {/* Identity — label + description. These travel with the node-instance
               (not the bindings), so a third-party reading the canvas can scan
-              "filter for AU market" without opening every node. Default placeholder
-              uses def.name so an unedited card still reads sensibly. */}
-          <section className="flex flex-col gap-2">
-            <label className="text-[11px] uppercase tracking-[0.1em] text-muted-foreground/80 font-semibold">
-              Identity
-            </label>
-            <div className="flex flex-col gap-1.5">
-              <Input
-                value={labelDraft}
-                onChange={(e) => setLabelDraft(e.target.value)}
-                placeholder={def.name}
-                className="h-8 text-[13px] font-medium"
-                aria-label="Node label"
-              />
-              <textarea
-                value={descriptionDraft}
-                onChange={(e) => setDescriptionDraft(e.target.value)}
-                placeholder={`What does this ${def.category} do in this rule? (e.g. "Filter for AU market" — shown on the canvas card)`}
-                rows={2}
-                className="w-full text-[12.5px] leading-snug rounded-md border border-input bg-background px-3 py-1.5 outline-none focus:ring-2 focus:ring-foreground/20 placeholder:text-muted-foreground/70 resize-y min-h-[44px] max-h-[120px]"
-                aria-label="Node description"
-              />
-            </div>
-            <p className="text-[10.5px] text-muted-foreground/70">
+              "filter for AU market" without opening every node. */}
+          <section className="field-group">
+            <span className="field-label">Identity</span>
+            <input
+              className="input"
+              value={labelDraft}
+              onChange={(e) => setLabelDraft(e.target.value)}
+              placeholder={def.name}
+              aria-label="Node label"
+            />
+            <textarea
+              className="json-input"
+              style={{ fontFamily: "var(--font-sans)", fontSize: 12, minHeight: 56 }}
+              value={descriptionDraft}
+              onChange={(e) => setDescriptionDraft(e.target.value)}
+              placeholder={`What does this ${def.category} do in this rule? (e.g. "Filter for AU market")`}
+              rows={2}
+              aria-label="Node description"
+            />
+            <p className="field-hint">
               Label and description are per-instance. The default label is the node-def name; the description shows on the canvas card so the rule reads as prose.
             </p>
           </section>
 
           {primary.length === 0 && advanced.length === 0 ? (
-            <div className="rounded-md border border-dashed bg-muted/30 px-4 py-6 text-center">
-              <p className="text-[13px] text-foreground font-medium">No ports to wire up</p>
-              <p className="text-[11.5px] text-muted-foreground mt-1 max-w-sm mx-auto">
+            <div className="struct-rows-empty">
+              <strong style={{ color: "var(--text)" }}>No ports to wire up</strong>
+              <div style={{ marginTop: 4 }}>
                 This node has no configurable ports — it works the same in every rule.
-                Edit its label and description above, or remove it via the Delete button below.
-              </p>
+                Edit its label/description above, or remove it via the Delete button below.
+              </div>
             </div>
           ) : null}
+
           {primary.map((port) => (
             <PortSection
               key={port.name}
@@ -196,17 +184,18 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
           ))}
 
           {advanced.length > 0 ? (
-            <div className="border-t pt-4">
+            <div style={{ borderTop: "1px solid var(--border)", paddingTop: 14 }}>
               <button
                 type="button"
                 onClick={() => setAdvancedOpen((o) => !o)}
-                className="flex items-center gap-1.5 text-[11.5px] uppercase tracking-[0.1em] text-muted-foreground/80 font-semibold hover:text-foreground transition-colors"
+                className="field-label"
+                style={{ cursor: "pointer", background: "transparent", border: 0, padding: 0 }}
               >
                 {advancedOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                 Advanced
               </button>
               {advancedOpen ? (
-                <div className="mt-3 flex flex-col gap-4">
+                <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 18 }}>
                   {advanced.map((port) => (
                     <PortSection
                       key={port.name}
@@ -222,32 +211,35 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
           ) : null}
         </div>
 
-        {/* Footer */}
-        <footer className="px-5 py-3 border-t shrink-0 flex items-center bg-muted/20 gap-2">
-          {/* Delete on the left, padded away from save-cancel */}
-          <Button
-            variant="ghost"
-            size="sm"
+        <footer className="popup-foot">
+          <button
+            type="button"
+            className="btn ghost sm"
+            style={{ color: "var(--danger)" }}
             onClick={() => {
               if (!confirm(`Delete "${instance.label ?? def.name}" from this rule?`)) return;
               removeInstance(instanceId);
               select({ kind: "none" });
               onClose();
             }}
-            className="text-destructive hover:text-destructive"
           >
             <Trash2 className="w-3.5 h-3.5" /> Delete
-          </Button>
+          </button>
 
-          <span className="text-[10.5px] text-muted-foreground ml-3 hidden md:inline">
-            Saves to the rule in memory. Hit <strong>Save</strong> in the toolbar to persist to disk.
+          <span className="meta hidden md:inline">
+            Saves to the rule in memory. Hit <strong style={{ color: "var(--text)" }}>Save</strong> in the toolbar to persist to disk.
           </span>
 
-          <div className="ml-auto flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={tryClose}>Cancel</Button>
-            <Button variant="default" size="sm" onClick={commit} disabled={!hasUnsavedChanges}>
+          <div className="actions">
+            <button type="button" className="btn ghost sm" onClick={tryClose}>Cancel</button>
+            <button
+              type="button"
+              className="btn primary sm"
+              onClick={commit}
+              disabled={!hasUnsavedChanges}
+            >
               <Check className="w-3.5 h-3.5" /> {hasUnsavedChanges ? "Save" : "Saved"}
-            </Button>
+            </button>
           </div>
         </footer>
       </DialogContent>
@@ -271,19 +263,13 @@ function PortSection({
   inputSchema: JsonSchema;
 }) {
   return (
-    <section className="flex flex-col gap-2">
-      <header className="flex items-baseline gap-2">
-        <span className="text-[11.5px] uppercase tracking-[0.1em] text-muted-foreground/80 font-semibold">
-          {humanLabel(port.name)}
-        </span>
-        {port.required ? (
-          <span className="req-pill">
-            req
-          </span>
-        ) : null}
-      </header>
+    <section className="field-group">
+      <span className="field-label">
+        {humanLabel(port.name)}
+        {port.required ? <span className="req-pill">req</span> : null}
+      </span>
       {port.description ? (
-        <p className="text-[12px] text-muted-foreground -mt-1 leading-relaxed">{port.description}</p>
+        <p className="field-hint">{port.description}</p>
       ) : null}
       <PortEditor port={port} binding={binding} onChange={onChange} inputSchema={inputSchema} />
     </section>
@@ -302,9 +288,6 @@ function PortEditor({
   inputSchema: JsonSchema;
 }) {
   // Port supports template-fill (e.g. constant node's value port).
-  // Render a "From template" / "Free literal" toggle when both kinds are
-  // allowed, or go straight to the template-fill editor when it's the only
-  // option. The literal side falls through to the rest of this function.
   const allowsTemplate = port.bindingKinds?.includes("template-fill") ?? false;
   if (allowsTemplate) {
     return (
@@ -317,11 +300,11 @@ function PortEditor({
     );
   }
 
-  // Enum string param → button group
+  // Enum string param → option-card grid
   if (port.enum && port.enum.length > 0) {
     const value = binding?.kind === "literal" ? binding.value : undefined;
     return (
-      <div className="grid grid-cols-2 gap-1.5">
+      <div className="grid grid-cols-2 gap-2">
         {port.enum.map((opt) => {
           const isActive = value === opt.value;
           return (
@@ -329,19 +312,10 @@ function PortEditor({
               key={opt.value}
               type="button"
               onClick={() => onChange({ kind: "literal", value: opt.value })}
-              className={cn(
-                "text-left flex flex-col gap-0.5 px-3 py-2 rounded-md border transition-colors",
-                isActive
-                  ? "bg-foreground text-background border-foreground"
-                  : "bg-card border-border hover:border-foreground/30",
-              )}
+              className={cn("option-card", isActive && "on")}
             >
-              <span className="text-[12.5px] font-medium leading-tight">{opt.label}</span>
-              {opt.description ? (
-                <span className={cn("text-[10.5px] leading-snug", isActive ? "opacity-80" : "text-muted-foreground")}>
-                  {opt.description}
-                </span>
-              ) : null}
+              <span className="opt-name">{opt.label}</span>
+              {opt.description ? <span className="opt-desc">{opt.description}</span> : null}
             </button>
           );
         })}
@@ -351,9 +325,6 @@ function PortEditor({
 
   // Date port
   if (port.type === "date") {
-    // If binding is path/context → render a schema tree to pick a date field.
-    // If binding is a date predicate → DateBindingPicker.
-    // Use bindingKinds to decide what's primary.
     const allowsField = !port.bindingKinds || port.bindingKinds.includes("path") || port.bindingKinds.includes("context");
     const allowsDateMode = !port.bindingKinds || port.bindingKinds.includes("date");
     const primary: "field" | "date" = port.bindingKinds?.[0] === "date" ? "date" : allowsField ? "field" : "date";
@@ -378,7 +349,6 @@ function PortEditor({
 
   // Number / integer port
   if (port.type === "number" || port.type === "integer") {
-    // If port allows path, prefer the schema picker. Otherwise number input.
     if (!port.bindingKinds || port.bindingKinds.includes("path")) {
       return (
         <SchemaFieldPicker
@@ -390,7 +360,8 @@ function PortEditor({
       );
     }
     return (
-      <Input
+      <input
+        className="input"
         type="number"
         value={binding?.kind === "literal" && typeof binding.value === "number" ? binding.value : ""}
         onChange={(e) => {
@@ -414,17 +385,12 @@ function PortEditor({
         />
       );
     }
-    // Literal-only object / object-array port — JSON textarea. Powers
-    // switch.cases (object-array of {match, name}), bucket.buckets
-    // (object-array of {name, weight}), api.headers / responseMap, and
-    // mutator.matchOn. We accept the JSON live so the user gets parse
-    // errors as they type rather than at Save.
     if (port.bindingKinds?.includes("literal")) {
       return <JsonLiteralEditor port={port} binding={binding} onChange={onChange} />;
     }
   }
 
-  // string-array / number-array — values port. Shuttle for ref-select, otherwise textarea.
+  // string-array / number-array — shuttle for ref-select, otherwise textarea.
   if (port.type === "string-array" || port.type === "number-array") {
     return (
       <ArrayValuesEditor
@@ -439,24 +405,18 @@ function PortEditor({
   if (port.type === "boolean") {
     const value = binding?.kind === "literal" ? binding.value : undefined;
     return (
-      <div className="flex gap-1.5">
+      <div className="pill-toggle">
         <button
           type="button"
           onClick={() => onChange({ kind: "literal", value: true })}
-          className={cn(
-            "h-8 px-3 text-[12px] font-medium rounded-md border transition-colors",
-            value === true ? "bg-foreground text-background border-foreground" : "bg-card border-border hover:border-foreground/30",
-          )}
+          className={cn(value === true && "on")}
         >
           Yes
         </button>
         <button
           type="button"
           onClick={() => onChange({ kind: "literal", value: false })}
-          className={cn(
-            "h-8 px-3 text-[12px] font-medium rounded-md border transition-colors",
-            value === false ? "bg-foreground text-background border-foreground" : "bg-card border-border hover:border-foreground/30",
-          )}
+          className={cn(value === false && "on")}
         >
           No
         </button>
@@ -466,7 +426,8 @@ function PortEditor({
 
   // Fallback: free text
   return (
-    <Input
+    <input
+      className="input"
       value={binding?.kind === "literal" && typeof binding.value === "string" ? binding.value : ""}
       onChange={(e) => onChange({ kind: "literal", value: e.target.value })}
       placeholder="value"
@@ -491,7 +452,7 @@ function TemplatePortEditor({
   inputSchema: JsonSchema;
 }) {
   const allowsLiteral = port.bindingKinds?.includes("literal") ?? false;
-  const showToggle = allowsLiteral; // template-fill is implied by being here
+  const showToggle = allowsLiteral;
   const isTemplate = binding?.kind === "template-fill" || (binding == null && !allowsLiteral);
 
   function pickTemplateMode() {
@@ -508,25 +469,11 @@ function TemplatePortEditor({
   return (
     <div className="flex flex-col gap-2">
       {showToggle ? (
-        <div className="inline-flex rounded-md border bg-muted/40 p-0.5 self-start">
-          <button
-            type="button"
-            onClick={pickTemplateMode}
-            className={cn(
-              "px-3 h-7 text-[12px] font-medium rounded transition-colors",
-              isTemplate ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-            )}
-          >
+        <div className="pill-toggle">
+          <button type="button" onClick={pickTemplateMode} className={cn(isTemplate && "on")}>
             From template
           </button>
-          <button
-            type="button"
-            onClick={pickLiteralMode}
-            className={cn(
-              "px-3 h-7 text-[12px] font-medium rounded transition-colors",
-              !isTemplate ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-            )}
-          >
+          <button type="button" onClick={pickLiteralMode} className={cn(!isTemplate && "on")}>
             Free literal
           </button>
         </div>
@@ -543,13 +490,9 @@ function TemplatePortEditor({
           inputSchema={inputSchema}
         />
       ) : (
-        // Literal mode for object/any ports — let the user paste a JSON blob.
-        // Keep it simple here; ObjectShapeEditor (key/value with inline binding
-        // kind) is the bigger fallback if we want it later. For now a JSON
-        // textarea keeps the surface small.
         <textarea
+          className="json-input"
           rows={6}
-          className="w-full text-[12px] font-mono px-2.5 py-1.5 rounded-md border border-border bg-background focus:outline-none focus:ring-2 focus:ring-foreground/30"
           value={
             binding?.kind === "literal"
               ? typeof binding.value === "string"
@@ -559,8 +502,6 @@ function TemplatePortEditor({
           }
           onChange={(e) => {
             const txt = e.target.value;
-            // Try JSON first; fall back to a string literal so the user can
-            // type freely without parse errors blocking each keystroke.
             try {
               const parsed = JSON.parse(txt);
               onChange({ kind: "literal", value: parsed });
@@ -620,42 +561,41 @@ function SchemaFieldPicker({
 
   return (
     <div className="flex flex-col gap-2">
-      <Input
+      <input
+        className="input mono"
+        style={{ fontFamily: "var(--font-mono)" }}
         value={value}
         onChange={(e) => onPick(e.target.value)}
         placeholder="$.field.path"
-        className="font-mono"
       />
       {suggested.length > 0 ? (
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <Wand2 className="w-2.5 h-2.5 text-amber-500" />
-          <span className="text-[10px] uppercase tracking-wider text-muted-foreground/80 font-medium mr-1">Best match:</span>
+        <div className="best-match-strip">
+          <span className="lead">
+            <Wand2 className="w-3 h-3" /> Best match
+          </span>
           {suggested.map((n) => (
             <button
               key={n.path}
               onClick={() => onPick(n.path)}
-              className={cn(
-                "font-mono text-[10.5px] px-1.5 h-5 rounded border transition-colors max-w-[60%] truncate",
-                value === n.path
-                  ? "bg-foreground text-background border-foreground"
-                  : "bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100 dark:bg-amber-950/30 dark:text-amber-200 dark:border-amber-900",
-              )}
+              className={cn("best-match-chip", value === n.path && "on")}
+              title={n.path}
             >
               {n.path}
             </button>
           ))}
         </div>
       ) : null}
-      <div className="rounded-md border bg-card max-h-[200px] overflow-auto">
-        <div className="px-2 py-1.5 border-b bg-muted/30 sticky top-0">
-          <Input
+      <div className="schema-tree">
+        <div className="schema-tree-search">
+          <input
+            className="input"
+            style={{ height: 26, fontSize: 11.5 }}
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             placeholder="Search fields…"
-            className="h-7 text-[11.5px]"
           />
         </div>
-        <div className="p-1">
+        <div className="schema-tree-rows">
           {tree ? (
             <SchemaTreeNode
               node={tree}
@@ -665,7 +605,7 @@ function SchemaFieldPicker({
               filter={f}
             />
           ) : (
-            <div className="px-2 py-2 text-[11.5px] text-muted-foreground italic">No schema yet.</div>
+            <div className="schema-row disabled">No schema yet.</div>
           )}
         </div>
       </div>
@@ -700,20 +640,15 @@ function SchemaTreeNode({
         onClick={() => compatible && !isRoot && onPick(node.path)}
         disabled={!compatible || isRoot}
         className={cn(
-          "text-left flex items-center gap-2 px-1.5 py-1 rounded text-[12px] transition-colors",
-          isSelected ? "bg-foreground text-background"
-          : isRoot ? "text-muted-foreground/70 cursor-default font-semibold uppercase tracking-wide text-[10px]"
-          : compatible ? "hover:bg-muted/60 text-foreground"
-          : "text-muted-foreground/50 cursor-not-allowed",
+          "schema-row",
+          isSelected && "on",
+          isRoot && "root",
+          !compatible && !isRoot && "disabled",
         )}
         style={{ paddingLeft: 6 + node.depth * 12 }}
       >
-        <span className={cn("font-mono truncate", isRoot ? "" : "text-[11.5px]")}>{isRoot ? "request" : node.label}</span>
-        {!isRoot ? (
-          <span className={cn("text-[10px] tabular-nums ml-auto pl-2", isSelected ? "opacity-80" : "text-muted-foreground/70")}>
-            {prettyTypeOf(node)}
-          </span>
-        ) : null}
+        <span className="mono">{isRoot ? "request" : node.label}</span>
+        {!isRoot ? <span className="type">{prettyTypeOf(node)}</span> : null}
       </button>
       {hasChildren && node.children!.map((child, i) => (
         <SchemaTreeNode key={i} node={child} selectedPath={selectedPath} onPick={onPick} portType={portType} filter={filter} />
@@ -746,8 +681,6 @@ function ArrayValuesEditor({
   const allowsLiteral = !port.bindingKinds || port.bindingKinds.includes("literal");
   const allowsMarkets = !!port.bindingKinds && port.bindingKinds.includes("markets-select");
 
-  // If the port is markets-only (e.g. node-filter-markets.literal), render the
-  // markets picker directly — no mode toggle.
   if (allowsMarkets && !allowsRefSelect && !allowsLiteral) {
     const seed: Extract<PortBinding, { kind: "markets-select" }> =
       binding?.kind === "markets-select"
@@ -756,11 +689,6 @@ function ArrayValuesEditor({
     return <MarketsPicker value={seed} onChange={(b) => onChange(b)} />;
   }
 
-  // When the port has a `defaultRef` and the user hasn't picked anything yet,
-  // act as if "From reference" was already selected with the default table —
-  // ref-bound filters (cabin, pax-type) open straight to the picker so the
-  // user doesn't have to swap tabs. The binding only commits to the draft
-  // when the user actually edits something in the picker.
   const effectiveBinding =
     binding ??
     (port.defaultRef && allowsRefSelect
@@ -775,16 +703,13 @@ function ArrayValuesEditor({
   return (
     <div className="flex flex-col gap-2">
       {(allowsRefSelect && allowsLiteral) ? (
-        <div className="inline-flex rounded-md border bg-muted/40 p-0.5 self-start">
+        <div className="pill-toggle">
           <button
             type="button"
             onClick={() => {
               if (binding?.kind !== "literal") onChange({ kind: "literal", value: [] });
             }}
-            className={cn(
-              "px-3 h-7 text-[12px] font-medium rounded transition-colors",
-              !isRefSelect ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-            )}
+            className={cn(!isRefSelect && "on")}
           >
             Type values
           </button>
@@ -792,10 +717,6 @@ function ArrayValuesEditor({
             type="button"
             onClick={() => {
               if (binding?.kind !== "ref-select") {
-                // Pre-fill with the port's natural reference if it has one
-                // (e.g. cabin filter → ref-cabin-classes). The user can still
-                // change the dropdown — this just spares them the question
-                // "which table?" for nodes that obviously map to one.
                 onChange({
                   kind: "ref-select",
                   referenceId: port.defaultRef?.referenceId ?? "",
@@ -803,10 +724,7 @@ function ArrayValuesEditor({
                 });
               }
             }}
-            className={cn(
-              "px-3 h-7 text-[12px] font-medium rounded transition-colors",
-              isRefSelect ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
-            )}
+            className={cn(isRefSelect && "on")}
           >
             From reference
           </button>
@@ -817,8 +735,8 @@ function ArrayValuesEditor({
         <RefSelectInline binding={effectiveBinding as Extract<PortBinding, { kind: "ref-select" }>} onChange={(b) => onChange(b)} />
       ) : (
         <textarea
+          className="json-input"
           rows={6}
-          className="w-full text-[12px] font-mono px-2.5 py-1.5 rounded-md border border-border bg-background focus:outline-none focus:ring-2 focus:ring-foreground/30"
           value={
             binding?.kind === "literal" && Array.isArray(binding.value)
               ? (binding.value as Array<string | number>).join("\n")
@@ -846,7 +764,6 @@ function RefSelectInline({
   const refs = useReferencesStore((s) => s.references);
   const ref = refs.find((r) => r.id === binding.referenceId);
 
-  // Pick value column auto if not set
   useEffect(() => {
     if (ref && !binding.valueColumn && ref.columns.length > 0) {
       onChange({ ...binding, valueColumn: ref.columns[0] });
@@ -869,8 +786,9 @@ function RefSelectInline({
   return (
     <div className="flex flex-col gap-2">
       <div className="grid grid-cols-[80px_1fr] gap-2 items-center">
-        <span className="text-[10.5px] uppercase tracking-wider text-muted-foreground/80 font-medium">From</span>
+        <span className="field-label" style={{ letterSpacing: "0.06em" }}>From</span>
         <select
+          className="input"
           value={binding.referenceId}
           onChange={(e) =>
             onChange({
@@ -881,7 +799,6 @@ function RefSelectInline({
               whereValues: undefined,
             })
           }
-          className="h-8 text-[12px] px-2 rounded border border-border bg-background"
         >
           <option value="">— choose a reference table —</option>
           {refs.map((r) => (
@@ -935,21 +852,9 @@ function prettyTypeOf(node: SchemaPathNode): string {
 }
 
 // ------------------------------------------------------------------
-// JSON literal editor — for object / object-array ports whose only
-// allowed binding kind is `literal`. Authors author the structure
-// inline (cases for switch, buckets for bucket, headers for api).
+// JSON literal editor — for object / object-array ports
 // ------------------------------------------------------------------
 
-/**
- * Per-port "row schema" for object-array ports we want a structured editor for.
- * If a port name matches a key here, the dialog renders a structured row form
- * (with a "View as JSON" escape hatch); otherwise it falls back to a plain
- * JSON textarea.
- *
- * Mirrors the engine's per-config Config record shape for the matching port —
- * cases for SwitchConfig.cases, buckets for BucketConfig.buckets. Edit only
- * when the engine schema changes.
- */
 type RowField = {
   field: string;
   label: string;
@@ -1010,7 +915,6 @@ function JsonLiteralEditor({
   const rowSchema = port.type === "object-array" ? STRUCTURED_ROW_SCHEMAS[port.name] : undefined;
   const [mode, setMode] = useState<"structured" | "json">(rowSchema ? "structured" : "json");
 
-  // ── JSON mode ──────────────────────────────────────────────────────────
   const initial = useMemo(() => {
     if (binding?.kind === "literal") {
       if (typeof binding.value === "string") return binding.value;
@@ -1022,13 +926,11 @@ function JsonLiteralEditor({
   const [text, setText] = useState(initial);
   const [error, setError] = useState<string | null>(null);
 
-  // If the binding changes externally (e.g. dialog reopen), resync.
   useEffect(() => {
     setText(initial);
     setError(null);
   }, [initial]);
 
-  // ── Structured mode ────────────────────────────────────────────────────
   const rows: Record<string, unknown>[] =
     binding?.kind === "literal" && Array.isArray(binding.value)
       ? (binding.value as Record<string, unknown>[])
@@ -1049,31 +951,20 @@ function JsonLiteralEditor({
 
   return (
     <div className="flex flex-col gap-2">
-      {/* Mode toggle — only when a structured schema exists for this port */}
       {rowSchema ? (
         <div className="flex items-center justify-between">
-          <div className="inline-flex rounded-md border bg-muted/40 p-0.5 self-start">
+          <div className="pill-toggle">
             <button
               type="button"
               onClick={() => setMode("structured")}
-              className={cn(
-                "px-2.5 h-6 text-[11px] font-medium rounded transition-colors",
-                mode === "structured"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
+              className={cn(mode === "structured" && "on")}
             >
               Structured
             </button>
             <button
               type="button"
               onClick={() => setMode("json")}
-              className={cn(
-                "px-2.5 h-6 text-[11px] font-medium rounded transition-colors",
-                mode === "json"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
+              className={cn(mode === "json" && "on")}
             >
               Raw JSON
             </button>
@@ -1082,7 +973,7 @@ function JsonLiteralEditor({
             <button
               type="button"
               onClick={() => commitRows([...rows, blankRow(rowSchema)])}
-              className="text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+              className="btn ghost sm"
               title="Add a new row"
             >
               + Add row
@@ -1091,7 +982,6 @@ function JsonLiteralEditor({
         </div>
       ) : null}
 
-      {/* Structured row editor */}
       {rowSchema && mode === "structured" ? (
         <StructuredRowEditor
           rowSchema={rowSchema}
@@ -1101,6 +991,7 @@ function JsonLiteralEditor({
       ) : (
         <>
           <textarea
+            className="json-input"
             rows={6}
             value={text}
             onChange={(e) => {
@@ -1120,11 +1011,8 @@ function JsonLiteralEditor({
               }
             }}
             placeholder={jsonPlaceholder}
-            className="w-full text-[12px] font-mono px-2.5 py-1.5 rounded-md border border-border bg-background focus:outline-none focus:ring-2 focus:ring-foreground/30"
           />
-          {error ? (
-            <span className="text-[10.5px] text-amber-700 dark:text-amber-400">{error}</span>
-          ) : null}
+          {error ? <span style={{ fontSize: 10.5, color: "var(--warn)" }}>{error}</span> : null}
         </>
       )}
     </div>
@@ -1158,33 +1046,30 @@ function StructuredRowEditor({
 
   if (rows.length === 0) {
     return (
-      <div className="rounded border border-dashed bg-muted/30 px-3 py-3 text-[11.5px] text-muted-foreground italic">
-        No rows yet. Click <strong className="font-medium not-italic">+ Add row</strong> to start.
+      <div className="struct-rows-empty">
+        No rows yet. Click <strong style={{ color: "var(--text)" }}>+ Add row</strong> to start.
       </div>
     );
   }
 
+  const gridCols = `${rowSchema.map(() => "1fr").join(" ")} 28px`;
+
   return (
-    <div className="rounded-md border bg-card divide-y">
-      {/* Header */}
-      <div
-        className="grid gap-2 px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted-foreground/70 font-medium bg-muted/30"
-        style={{ gridTemplateColumns: rowSchema.map(() => "1fr").join(" ") + " 28px" }}
-      >
+    <div className="struct-rows">
+      <div className="struct-rows-head" style={{ gridTemplateColumns: gridCols }}>
         {rowSchema.map((f) => (
           <div key={f.field} title={f.description}>
             {f.label}
-            {f.required ? <span className="ml-0.5 text-red-700/80">*</span> : null}
+            {f.required ? <span style={{ color: "var(--danger)", marginLeft: 2 }}>*</span> : null}
           </div>
         ))}
         <div />
       </div>
-      {/* Rows */}
       {rows.map((row, i) => (
         <div
           key={i}
-          className="grid gap-2 px-3 py-2 items-center"
-          style={{ gridTemplateColumns: rowSchema.map(() => "1fr").join(" ") + " 28px" }}
+          className="struct-rows-row"
+          style={{ gridTemplateColumns: gridCols }}
         >
           {rowSchema.map((f) => (
             <RowCell
@@ -1197,7 +1082,7 @@ function StructuredRowEditor({
           <button
             type="button"
             onClick={() => removeRow(i)}
-            className="w-7 h-7 inline-flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+            className="x"
             title="Remove this row"
             aria-label="Remove row"
           >
@@ -1220,26 +1105,25 @@ function RowCell({
 }) {
   if (field.type === "number") {
     return (
-      <Input
+      <input
+        className="input"
         type="number"
         value={typeof value === "number" ? value : ""}
         onChange={(e) => onChange(e.target.value === "" ? 0 : Number(e.target.value))}
         placeholder={field.placeholder}
-        className="h-8 text-[12px]"
       />
     );
   }
   if (field.type === "any") {
-    // Type-detect on input — let the user write `42` or `true` or `"text"`
-    // and parse the JSON-like literal so engine receives the right type.
     const display = value == null ? "" : typeof value === "string" ? value : JSON.stringify(value);
     return (
-      <Input
+      <input
+        className="input mono"
+        style={{ fontFamily: "var(--font-mono)" }}
         value={display}
         onChange={(e) => {
           const v = e.target.value;
           if (v === "") return onChange("");
-          // Try strict JSON first (catches numbers, booleans, null, arrays).
           try {
             onChange(JSON.parse(v));
           } catch {
@@ -1247,24 +1131,20 @@ function RowCell({
           }
         }}
         placeholder={field.placeholder}
-        className="h-8 text-[12px] font-mono"
       />
     );
   }
-  // string
   return (
-    <Input
+    <input
+      className="input"
       value={typeof value === "string" ? value : value == null ? "" : String(value)}
       onChange={(e) => onChange(e.target.value)}
       placeholder={field.placeholder}
-      className="h-8 text-[12px]"
     />
   );
 }
 
 function shallowEqualBindings(a: Record<string, PortBinding>, b: Record<string, PortBinding>): boolean {
-  // Compare via JSON.stringify of each value — bindings are small structured
-  // objects; this is plenty fast and catches deep changes (e.g. include[]).
   const ka = Object.keys(a);
   const kb = Object.keys(b);
   if (ka.length !== kb.length) return false;

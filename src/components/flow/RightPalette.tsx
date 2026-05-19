@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useNodesStore } from "@/lib/store/nodes-store";
 import { useReferencesStore } from "@/lib/store/references-store";
 import type { NodeDef, NodeCategory, ReferenceSet } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 export type PaletteDragPayload =
   | { kind: "node"; nodeId: string }
@@ -127,59 +128,54 @@ export function RightPalette() {
   }, [filteredNodes]);
 
   return (
-    <aside className="w-64 shrink-0 flex flex-col border-l bg-muted/20 overflow-hidden">
-      <header className="px-3 h-14 shrink-0 flex items-center justify-between border-b bg-background">
-        <div className="flex flex-col leading-tight">
-          <span className="text-[13px] font-semibold tracking-tight text-foreground">Add nodes</span>
-          <span className="text-[10px] text-muted-foreground">Drag onto canvas</span>
+    <aside className="palette-rail">
+      <header className="palette-head">
+        <div>
+          <span className="title">Add nodes</span>
+          <span className="subtitle">Drag onto canvas</span>
         </div>
-        <Link
-          href="/nodes"
-          className="text-[10.5px] uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors font-medium"
-        >
+        <Link href="/nodes" className="manage-link">
           Manage
         </Link>
       </header>
 
-      <div className="px-3 py-2 border-b bg-background shrink-0">
-        <div className="relative">
-          <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground/60" />
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search nodes…"
-            className="w-full h-7 text-[12px] pl-7 pr-7 rounded-md border border-border bg-muted/30 focus:bg-background focus:outline-none focus:ring-2 focus:ring-foreground/20"
-          />
-          {query ? (
-            <button
-              type="button"
-              onClick={() => setQuery("")}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 w-4 h-4 inline-flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground"
-              title="Clear search"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          ) : null}
-        </div>
+      <div className="palette-search">
+        <Search className="lead" />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search nodes…"
+        />
+        {query ? (
+          <button
+            type="button"
+            onClick={() => setQuery("")}
+            className="clear-btn"
+            title="Clear search"
+            aria-label="Clear search"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        ) : null}
       </div>
 
-      <div className="flex-1 overflow-auto py-3">
+      <div className="palette-body">
         {!loaded ? (
-          <div className="px-4 text-[11px] text-muted-foreground">Loading library…</div>
+          <div className="palette-empty">Loading library…</div>
         ) : nodes.length === 0 ? (
-          <div className="mx-2 px-3 py-3 text-[11px] text-muted-foreground rounded-md border border-dashed bg-card">
+          <div className="palette-empty">
             No nodes in library.{" "}
-            <Link href="/nodes" className="underline text-foreground hover:no-underline">
+            <Link href="/nodes" style={{ color: "var(--accent)", textDecoration: "underline" }}>
               Add some
             </Link>
           </div>
         ) : (
           <>
             {grouped.map(({ name, defs }) => (
-              <div key={name} className="mb-2">
-                <SectionHeader>{name}</SectionHeader>
-                <div className="flex flex-col gap-1.5 px-2">
+              <div key={name} className="palette-section">
+                <div className="palette-section-head">{name}</div>
+                <div className="palette-section-list">
                   {defs.map((def) => (
                     <PaletteTile key={def.id} def={def} />
                   ))}
@@ -189,16 +185,14 @@ export function RightPalette() {
 
             {/* References — drag a table onto the canvas to create a pre-wired lookup */}
             {filteredRefs.length > 0 ? (
-              <div className="mb-2">
-                <SectionHeader>
-                  <span className="inline-flex items-center gap-1.5">
-                    <Database className="w-2.5 h-2.5" />
-                    Reference data
-                  </span>
-                </SectionHeader>
-                <div className="flex flex-col gap-1.5 px-2">
+              <div className="palette-section">
+                <div className="palette-section-head">
+                  <Database className="w-2.5 h-2.5" />
+                  Reference data
+                </div>
+                <div className="palette-section-list">
                   {filteredRefs.map((r) => (
-                    <ReferenceTile key={r.id} ref={r} />
+                    <ReferenceTile key={r.id} refSet={r} />
                   ))}
                 </div>
               </div>
@@ -206,7 +200,7 @@ export function RightPalette() {
 
             {/* No-results state when filter is active and nothing matches */}
             {q && grouped.length === 0 && filteredRefs.length === 0 ? (
-              <div className="mx-2 px-3 py-3 text-[11.5px] text-muted-foreground rounded-md border border-dashed bg-card">
+              <div className="palette-empty">
                 Nothing matches &ldquo;{query}&rdquo;.
               </div>
             ) : null}
@@ -217,7 +211,7 @@ export function RightPalette() {
   );
 }
 
-function ReferenceTile({ ref: r }: { ref: ReferenceSet }) {
+function ReferenceTile({ refSet: r }: { refSet: ReferenceSet }) {
   function onDragStart(e: React.DragEvent<HTMLDivElement>) {
     const payload: PaletteDragPayload = { kind: "reference", referenceId: r.id };
     const json = JSON.stringify(payload);
@@ -230,27 +224,20 @@ function ReferenceTile({ ref: r }: { ref: ReferenceSet }) {
     <div
       draggable
       onDragStart={onDragStart}
-      className="group grid grid-cols-[auto_1fr_auto] gap-2 items-center px-2 py-2 rounded-md cursor-grab active:cursor-grabbing select-none bg-card border border-border hover:border-foreground/30 hover:shadow-sm transition-all"
+      className="palette-tile"
       title={`${r.name} — drag onto the canvas to create a pre-wired lookup node`}
     >
-      <GripVertical className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
-      <div className="min-w-0">
-        <div className="text-[12.5px] font-medium leading-tight truncate text-foreground">{r.name}</div>
-        <div className="text-[10.5px] truncate text-muted-foreground mt-0.5">
-          {r.rows.length} rows · {r.columns.join(" · ")}
-        </div>
-      </div>
-      <span className="inline-flex items-center justify-center w-5 h-5 rounded text-muted-foreground/60">
-        <Database className="w-3 h-3" />
+      <GripVertical className="grip" />
+      <span
+        className="badge"
+        style={{ background: "var(--text-muted)", paddingInline: 6 }}
+      >
+        <Database className="w-2.5 h-2.5" />
       </span>
-    </div>
-  );
-}
-
-function SectionHeader({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.1em] text-muted-foreground/80 font-medium">
-      {children}
+      <div className="body">
+        <div className="tile-name">{r.name}</div>
+        <div className="tile-desc">{r.rows.length} rows · {r.columns.join(" · ")}</div>
+      </div>
     </div>
   );
 }
@@ -271,34 +258,24 @@ function PaletteTile({ def }: { def: NodeDef }) {
     <div
       draggable
       onDragStart={onDragStart}
-      className={
-        "group grid grid-cols-[auto_42px_1fr] gap-2 items-center px-2 py-2 rounded-md cursor-grab active:cursor-grabbing select-none bg-card border transition-all " +
-        (unsupported
-          ? "border-amber-200 dark:border-amber-900 hover:border-amber-400 hover:shadow-sm"
-          : "border-border hover:border-foreground/30 hover:shadow-sm")
-      }
+      className={cn("palette-tile", unsupported && "unsupported")}
       title={`${def.name} — drag onto the canvas${unsupported ? " (pending engine support)" : ""}`}
     >
-      <GripVertical className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
+      <GripVertical className="grip" />
       <span
-        className="inline-flex items-center justify-center px-1.5 h-5 text-[10px] font-semibold rounded font-mono tracking-wide"
-        style={{ background: accent, color: "#fff" }}
+        className="badge"
+        style={{ background: accent, paddingInline: 6, minWidth: 26 }}
       >
         {def.ui?.badge ?? "?"}
       </span>
-      <div className="min-w-0">
-        <div className="flex items-center gap-1">
-          <span className="text-[12.5px] font-medium leading-tight truncate text-foreground">{def.name}</span>
+      <div className="body">
+        <div className="tile-name">
+          <span>{def.name}</span>
           {unsupported ? (
-            <AlertTriangle
-              className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400 shrink-0"
-              aria-label="Pending engine support"
-            />
+            <AlertTriangle className="tile-warn" aria-label="Pending engine support" />
           ) : null}
         </div>
-        {def.description ? (
-          <div className="text-[10.5px] truncate text-muted-foreground mt-0.5">{def.description}</div>
-        ) : null}
+        {def.description ? <div className="tile-desc">{def.description}</div> : null}
       </div>
     </div>
   );

@@ -6,8 +6,6 @@ import { toast } from "sonner";
 import { Save, Trash2 } from "lucide-react";
 import type { ReferenceSet } from "@/lib/types";
 import { PageHeader } from "@/components/ui/PageHeader";
-
-import { Input } from "@/components/ui/Input";
 import { ReferenceTableEditor } from "@/components/refs/ReferenceTableEditor";
 
 export function EditReferenceClient({ initial }: { initial: ReferenceSet }) {
@@ -71,44 +69,64 @@ export function EditReferenceClient({ initial }: { initial: ReferenceSet }) {
         description={`${initial.id} · ${columns.length} columns · ${rows.length} rows`}
         actions={
           <>
-            <button className="btn danger" onClick={remove} disabled={busy}>
+            <button className="btn ghost sm" style={{ color: "var(--danger)" }} onClick={remove} disabled={busy}>
               <Trash2 className="w-3.5 h-3.5" /> Delete
             </button>
-            <button className="btn primary" onClick={save} disabled={busy}>
+            <button className="btn primary sm" onClick={save} disabled={busy}>
               <Save className="w-3.5 h-3.5" /> Save
             </button>
           </>
         }
       />
-      <div className="flex-1 overflow-auto px-8 py-6">
+      <div className="flex-1 overflow-auto" style={{ background: "var(--bg)", padding: "24px 28px" }}>
         <div className="max-w-5xl flex flex-col gap-6">
           <section
-            className="rounded p-5 grid grid-cols-3 gap-4"
-            style={{ background: "var(--color-bg)", border: "1px solid var(--color-border)" }}
+            className="grid grid-cols-3 gap-4"
+            style={{
+              background: "var(--panel)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-lg)",
+              boxShadow: "var(--shadow-sm)",
+              padding: 22,
+            }}
           >
             <Field label="Name">
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
+              <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
             </Field>
             <Field label="ID (read-only)">
-              <Input value={initial.id} readOnly className="mono" />
+              <input
+                className="input mono"
+                style={{ fontFamily: "var(--font-mono)" }}
+                value={initial.id}
+                readOnly
+              />
             </Field>
             <Field label="Version">
-              <Input
+              <input
+                className="input"
                 type="number"
                 value={version}
                 onChange={(e) => setVersion(Math.max(1, Number(e.target.value) || 1))}
               />
             </Field>
             <Field label="Description" full>
-              <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="(optional)" />
+              <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="(optional)" />
             </Field>
           </section>
 
           <section
-            className="rounded p-5 flex flex-col gap-3"
-            style={{ background: "var(--color-bg)", border: "1px solid var(--color-border)" }}
+            className="flex flex-col gap-3"
+            style={{
+              background: "var(--panel)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-lg)",
+              boxShadow: "var(--shadow-sm)",
+              padding: 22,
+            }}
           >
-            <h2 className="text-[14px] font-medium tracking-tight">Columns &amp; rows</h2>
+            <h2 style={{ fontSize: 14, fontWeight: 500, letterSpacing: "-0.012em", color: "var(--text)", margin: 0 }}>
+              Columns &amp; rows
+            </h2>
             <ReferenceTableEditor
               columns={columns}
               rows={rows}
@@ -124,8 +142,18 @@ export function EditReferenceClient({ initial }: { initial: ReferenceSet }) {
 
 function Field({ label, children, full }: { label: string; children: React.ReactNode; full?: boolean }) {
   return (
-    <label className={`flex flex-col gap-1 ${full ? "col-span-3" : ""}`}>
-      <span className="text-[11px] uppercase tracking-wider" style={{ color: "var(--color-fg-dim)" }}>{label}</span>
+    <label className={`flex flex-col gap-1.5 ${full ? "col-span-3" : ""}`}>
+      <span
+        style={{
+          fontSize: 10.5,
+          textTransform: "uppercase",
+          letterSpacing: "0.08em",
+          fontWeight: 600,
+          color: "var(--text-muted)",
+        }}
+      >
+        {label}
+      </span>
       {children}
     </label>
   );
