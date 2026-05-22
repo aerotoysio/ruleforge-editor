@@ -15,6 +15,9 @@ import {
   AlertCircle,
   RefreshCw,
   Loader2,
+  Upload,
+  Download,
+  Database,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -85,6 +88,64 @@ export function CommandsClient({ root, cliProject, engineCliPath, engineUrl, doc
   const [query, setQuery] = useState("");
   const [reloading, setReloading] = useState(false);
   const [migrating, setMigrating] = useState(false);
+  const [pushingDf, setPushingDf] = useState(false);
+  const [pullingDf, setPullingDf] = useState(false);
+
+  async function pushToDocumentForge() {
+    setPushingDf(true);
+    try {
+      const res = await fetch("/api/sync/push-to-documentforge", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error ?? "Push failed");
+        return;
+      }
+      const n = data.totalInserted ?? 0;
+      const errs = (data.errors ?? []).length;
+      const cols = Object.entries(data.collections ?? {})
+        .map(([k, v]) => `${k}=${(v as { inserted: number }).inserted}`)
+        .join(" · ");
+      if (errs > 0) {
+        toast.warning(`Pushed ${n} docs to db '${data.database}' with ${errs} errors. ${cols}`);
+      } else {
+        toast.success(`Pushed ${n} docs to db '${data.database}'. ${cols}`);
+      }
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setPushingDf(false);
+    }
+  }
+
+  async function pullFromDocumentForge() {
+    if (!confirm(
+      "Pull all entities from DocumentForge into this workspace's filesystem? Local files for the same ids will be OVERWRITTEN; local files not in DocumentForge are left alone.",
+    )) return;
+    setPullingDf(true);
+    try {
+      const res = await fetch("/api/sync/pull-from-documentforge", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error ?? "Pull failed");
+        return;
+      }
+      const n = data.totalPulled ?? 0;
+      const errs = (data.errors ?? []).length;
+      const cols = Object.entries(data.collections ?? {})
+        .map(([k, v]) => `${k}=${(v as { written: number }).written}`)
+        .filter((s) => !s.endsWith("=0"))
+        .join(" · ");
+      if (errs > 0) {
+        toast.warning(`Pulled ${n} docs from '${data.database}' with ${errs} errors. ${cols}`);
+      } else {
+        toast.success(`Pulled ${n} docs from '${data.database}'. ${cols}`);
+      }
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setPullingDf(false);
+    }
+  }
 
   async function flattenRules() {
     if (!confirm(
@@ -315,6 +376,61 @@ rules/markets-discount/            rules/markets-discount.json
           </pre>
         </div>
       </section>
+
+      {/* DocumentForge sync — push/pull the workspace between filesystem and
+          a DocumentForge instance. Filesystem stays the authoring surface;
+          DocumentForge is the durable store + (future) engine source. */}
+      {documentForgeUrl ? (
+        <section style={{ marginBottom: 18 }}>
+          <SectionHeader
+            icon={<Database className="w-3.5 h-3.5" />}
+            title="DocumentForge sync"
+            subtitle="Push every rule / schema / template / asset / ref / node from this workspace into a DocumentForge database, or pull them back. Idempotent — collections are cleared then bulk-inserted on push; pulls write through the editor's normal save path."
+          />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <ActionCard
+              title="Push workspace → DocumentForge"
+              description="Read every entity locally, clear the matching DocumentForge collection, bulk-insert. Database name comes from Settings → DocumentForge database (falls back to workspace name)."
+              actionLabel="Push now"
+              actionIcon={<Upload className="w-3 h-3" />}
+              loading={pushingDf}
+              onAction={pushToDocumentForge}
+            />
+            <ActionCard
+              title="Pull DocumentForge → workspace"
+              description="Read every collection from DocumentForge and write through the editor's writers. Existing local files for the same ids are overwritten; local-only files are kept."
+              actionLabel="Pull now"
+              actionIcon={<Download className="w-3 h-3" />}
+              actionVariant="ghost"
+              loading={pullingDf}
+              onAction={pullFromDocumentForge}
+            />
+          </div>
+          <pre
+            style={{
+              margin: "12px 0 0",
+              padding: "12px 14px",
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+              lineHeight: 1.55,
+              color: "var(--text-muted)",
+              background: "var(--panel)",
+              border: "1px solid var(--border)",
+              borderRadius: 7,
+              whiteSpace: "pre-wrap",
+            }}
+          >
+{`# Equivalent shell calls:
+${renderCmd(["curl", "-sS", "-X", "POST", `${documentForgeUrl.replace(/\/$/, "")}/databases`, "-H", "content-type: application/json", "-d", '{"name":"ruleforge","createIfMissing":true}'])}
+
+# Push from the editor's API (handles all collections at once):
+${renderCmd(["curl", "-sS", "-X", "POST", "http://localhost:3001/api/sync/push-to-documentforge"])}
+
+# Pull back:
+${renderCmd(["curl", "-sS", "-X", "POST", "http://localhost:3001/api/sync/pull-from-documentforge"])}`}
+          </pre>
+        </section>
+      ) : null}
 
       {/* HTTP server (fast-path) callout — explains the ~25x speedup. */}
       <section style={{ marginBottom: 18 }}>
@@ -617,6 +733,55 @@ ${renderCmd(["curl", "-sS", "-X", "POST", `${engineUrl.replace(/\/$/, "")}/admin
 }
 
 // ── Reusable bits ───────────────────────────────────────────────────────
+
+function ActionCard({
+  title,
+  description,
+  actionLabel,
+  actionIcon,
+  actionVariant = "primary",
+  loading,
+  onAction,
+}: {
+  title: string;
+  description: string;
+  actionLabel: string;
+  actionIcon: React.ReactNode;
+  actionVariant?: "primary" | "ghost";
+  loading: boolean;
+  onAction: () => void;
+}) {
+  return (
+    <div
+      style={{
+        background: "var(--panel)",
+        border: "1px solid var(--border)",
+        borderRadius: "var(--radius-lg)",
+        padding: "12px 14px",
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+      }}
+    >
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 12.5, color: "var(--text)", fontWeight: 500 }}>{title}</div>
+        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 3, lineHeight: 1.45 }}>
+          {description}
+        </div>
+      </div>
+      <button
+        type="button"
+        className={`btn ${actionVariant === "primary" ? "primary" : "ghost"} sm`}
+        style={{ alignSelf: "flex-start" }}
+        onClick={onAction}
+        disabled={loading}
+      >
+        {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : actionIcon}
+        {loading ? "Working…" : actionLabel}
+      </button>
+    </div>
+  );
+}
 
 function SectionHeader({ icon, title, subtitle }: { icon: React.ReactNode; title: React.ReactNode; subtitle?: string }) {
   return (

@@ -32,6 +32,12 @@ type AppSettings = {
   engineUrl?: string;
   engineCliPath?: string;
   documentForgeUrl?: string;
+  /**
+   * DocumentForge database name to push/pull this workspace into. When unset,
+   * the sync API falls back to the workspace.json `name`, slugified, or
+   * "ruleforge" as a last resort.
+   */
+  documentForgeDatabase?: string;
   aiProvider?: AiProvider;
   ollamaUrl?: string;
   ollamaModel?: string;
@@ -49,6 +55,7 @@ export async function readSettings(): Promise<AppSettings> {
       engineUrl: parsed.engineUrl,
       engineCliPath: parsed.engineCliPath,
       documentForgeUrl: parsed.documentForgeUrl,
+      documentForgeDatabase: parsed.documentForgeDatabase,
       aiProvider: parsed.aiProvider,
       ollamaUrl: parsed.ollamaUrl,
       ollamaModel: parsed.ollamaModel,
