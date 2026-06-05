@@ -32,7 +32,7 @@ const SEGMENT_LABELS: Record<string, string> = {
  * a global topbar stealing 52 px and a sidebar-aligned border. The page
  * route matching here keeps the topbar out of those views.
  */
-const HIDE_TOPBAR_PREFIXES = ["/rules/", "/test/"];
+const HIDE_TOPBAR_PREFIXES = ["/rules/"];
 
 export function Topbar() {
   const pathname = usePathname() ?? "/";

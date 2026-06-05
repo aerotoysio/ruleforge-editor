@@ -227,7 +227,7 @@ export function Toolbar({ onTest, onOpenRuleSettings, onOpenAiDraft }: Props = {
         <button
           className="btn ghost sm"
           onClick={() => onOpenAiDraft?.()}
-          title="Draft from prompt via local Ollama"
+          title="Draft a rule from a plain-English scenario with Claude"
         >
           <Sparkles className="w-3.5 h-3.5" /> AI draft
         </button>

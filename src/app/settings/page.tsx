@@ -15,6 +15,9 @@ export default async function SettingsPage() {
         documentForgeUrl: settings.documentForgeUrl ?? "",
         ollamaUrl: settings.ollamaUrl ?? "",
         ollamaModel: settings.ollamaModel ?? "",
+        aiProvider: settings.aiProvider ?? "anthropic",
+        anthropicApiKey: settings.anthropicApiKey ?? "",
+        anthropicModel: settings.anthropicModel ?? "",
         workspaceName: workspace?.name ?? null,
       }}
     />

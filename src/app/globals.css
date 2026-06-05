@@ -342,6 +342,11 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
 .react-flow__attribution { display: none; }
 .react-flow__node { font-family: var(--font-sans); }
 .react-flow__background { background: var(--bg); }
+/* Connection handles are the edge-drag points — make them obvious & grabbable. */
+.react-flow__handle { transition: transform 0.1s ease, box-shadow 0.1s ease; cursor: crosshair; }
+.react-flow__handle:hover,
+.react-flow__handle.connectingfrom,
+.react-flow__handle.connectingto { transform: scale(1.5); box-shadow: 0 0 0 4px var(--accent-soft); z-index: 10; }
 
 .rf-edge-pass { stroke: var(--color-pass); }
 .rf-edge-fail { stroke: var(--color-fail); }

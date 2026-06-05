@@ -424,6 +424,21 @@ function compileMutatorConfig(
   extras: Record<string, unknown>,
   ctx: CompileContext,
 ): unknown {
+  // Multi-field map mutator: extras.fields = { targetField: sourceBinding }.
+  // One node sets many fields, compiled to the engine's `sets` array.
+  const fieldsMap = extras.fields;
+  if (fieldsMap && typeof fieldsMap === "object" && !Array.isArray(fieldsMap)) {
+    const sets: Array<Record<string, unknown>> = [];
+    for (const [tgt, raw] of Object.entries(fieldsMap as Record<string, unknown>)) {
+      if (!tgt) continue;
+      const b = raw as PortBinding;
+      if (b?.kind === "path") sets.push({ target: tgt, from: b.path });
+      else if (b?.kind === "context") sets.push({ target: tgt, from: contextPath(b.key) });
+      else if (b?.kind === "literal") sets.push({ target: tgt, value: b.value });
+    }
+    if (sets.length > 0) return { sets };
+  }
+
   const target = requireLiteralString(inst, "target", bindings.target) ?? "";
   // Two flavours: lookup-and-replace (mutator-lookup) vs set-property
   // (mutator-set). Distinguished by presence of `referenceId`.

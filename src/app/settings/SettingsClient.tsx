@@ -16,6 +16,9 @@ type Initial = {
   documentForgeUrl: string;
   ollamaUrl: string;
   ollamaModel: string;
+  aiProvider: "ollama" | "anthropic";
+  anthropicApiKey: string;
+  anthropicModel: string;
   workspaceName: string | null;
 };
 
@@ -24,7 +27,7 @@ type Group = "workspace" | "engine" | "ai" | "future";
 const GROUPS: { id: Group; label: string; desc: string }[] = [
   { id: "workspace", label: "Workspace",     desc: "Identity, rules location, recent paths." },
   { id: "engine",    label: "Engine runtime", desc: "Local CLI and HTTP endpoints." },
-  { id: "ai",        label: "AI assistant",   desc: "Local Ollama for AI-draft rule authoring." },
+  { id: "ai",        label: "AI assistant",   desc: "Claude (Anthropic) or local Ollama for AI rule drafting." },
   { id: "future",    label: "Coming soon",    desc: "Hooks for shadow mode, audit, integrations." },
 ];
 
@@ -39,6 +42,9 @@ export function SettingsClient({ initial }: { initial: Initial }) {
   const [documentForgeUrl, setDocumentForgeUrl] = useState(initial.documentForgeUrl);
   const [ollamaUrl, setOllamaUrl] = useState(initial.ollamaUrl || "http://localhost:11434");
   const [ollamaModel, setOllamaModel] = useState(initial.ollamaModel);
+  const [aiProvider, setAiProvider] = useState<"ollama" | "anthropic">(initial.aiProvider);
+  const [anthropicApiKey, setAnthropicApiKey] = useState(initial.anthropicApiKey);
+  const [anthropicModel, setAnthropicModel] = useState(initial.anthropicModel || "claude-opus-4-8");
   const [models, setModels] = useState<{ name: string; size?: number }[]>([]);
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [needsSeed, setNeedsSeed] = useState(false);
@@ -53,9 +59,12 @@ export function SettingsClient({ initial }: { initial: Initial }) {
       engineCliPath !== initial.engineCliPath ||
       documentForgeUrl !== initial.documentForgeUrl ||
       ollamaUrl !== (initial.ollamaUrl || "http://localhost:11434") ||
-      ollamaModel !== initial.ollamaModel
+      ollamaModel !== initial.ollamaModel ||
+      aiProvider !== initial.aiProvider ||
+      anthropicApiKey !== initial.anthropicApiKey ||
+      anthropicModel !== (initial.anthropicModel || "claude-opus-4-8")
     );
-  }, [rootPath, engineUrl, engineCliPath, documentForgeUrl, ollamaUrl, ollamaModel, initial]);
+  }, [rootPath, engineUrl, engineCliPath, documentForgeUrl, ollamaUrl, ollamaModel, aiProvider, anthropicApiKey, anthropicModel, initial]);
 
   async function loadModels() {
     setModelsError(null);
@@ -90,6 +99,9 @@ export function SettingsClient({ initial }: { initial: Initial }) {
           documentForgeUrl: documentForgeUrl.trim() || null,
           ollamaUrl: ollamaUrl.trim() || null,
           ollamaModel: ollamaModel.trim() || null,
+          aiProvider,
+          anthropicApiKey: anthropicApiKey.trim() || null,
+          anthropicModel: anthropicModel.trim() || null,
           seed,
         }),
       });
@@ -278,56 +290,106 @@ export function SettingsClient({ initial }: { initial: Initial }) {
             {activeGroup === "ai" ? (
               <SettingsGroup
                 title="AI assistant"
-                desc="Local Ollama server for the AI-draft sheet in the rule editor. Pull a JSON-savvy model first."
+                desc="Powers AI rule drafting (the editor's AI-draft bar) and test-input suggestions. Claude (Anthropic) is recommended; Ollama runs fully local."
               >
-                <Row name="Ollama URL" desc="Default is http://localhost:11434.">
-                  <Input
-                    value={ollamaUrl}
-                    onChange={(e) => setOllamaUrl(e.target.value)}
-                    placeholder="http://localhost:11434"
-                    className="mono"
-                  />
-                </Row>
-                <Row
-                  name="Model"
-                  desc="The model used to generate rule drafts. Refresh to list pulled models."
-                >
-                  <div className="flex gap-2 items-center" style={{ minWidth: 0 }}>
-                    {models.length > 0 ? (
-                      <select
-                        value={ollamaModel}
-                        onChange={(e) => setOllamaModel(e.target.value)}
-                        className="input mono"
-                        style={{ flex: 1 }}
+                <Row name="Provider" desc="Claude gives the best drafts. Ollama needs no key but is weaker.">
+                  <div className="inline-flex rounded-md border border-border p-0.5" style={{ background: "var(--panel-2)" }}>
+                    {(["anthropic", "ollama"] as const).map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setAiProvider(p)}
+                        className="px-3 h-7 text-[12px] font-medium rounded transition-colors"
+                        style={
+                          aiProvider === p
+                            ? { background: "var(--panel)", color: "var(--text)", boxShadow: "var(--shadow-sm)" }
+                            : { color: "var(--text-muted)", background: "transparent", border: 0, cursor: "pointer" }
+                        }
                       >
-                        <option value="">— pick a pulled model —</option>
-                        {models.map((m) => (
-                          <option key={m.name} value={m.name}>
-                            {m.name}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
+                        {p === "anthropic" ? "Claude (Anthropic)" : "Ollama (local)"}
+                      </button>
+                    ))}
+                  </div>
+                </Row>
+
+                {aiProvider === "anthropic" ? (
+                  <>
+                    <Row
+                      name="Anthropic API key"
+                      desc="From console.anthropic.com → API Keys (add billing first). Stored locally in ~/.ruleforge-editor.json; only sent to Anthropic from the server, never the browser."
+                    >
                       <Input
-                        value={ollamaModel}
-                        onChange={(e) => setOllamaModel(e.target.value)}
-                        placeholder="qwen2.5-coder:14b"
+                        type="password"
+                        value={anthropicApiKey}
+                        onChange={(e) => setAnthropicApiKey(e.target.value)}
+                        placeholder="sk-ant-…"
                         className="mono"
                       />
-                    )}
-                    <button className="btn sm" onClick={loadModels} title="List Ollama models">
-                      <RefreshCw className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                  {modelsError ? (
-                    <div
-                      className="mono"
-                      style={{ marginTop: 6, fontSize: 11, color: "var(--danger)" }}
+                    </Row>
+                    <Row name="Model" desc="Opus is most capable; Haiku is cheapest. Pay-per-token (a draft is a fraction of a cent to a few cents).">
+                      <select
+                        value={anthropicModel}
+                        onChange={(e) => setAnthropicModel(e.target.value)}
+                        className="input mono"
+                      >
+                        <option value="claude-opus-4-8">claude-opus-4-8 — most capable (default)</option>
+                        <option value="claude-sonnet-4-6">claude-sonnet-4-6 — fast + balanced</option>
+                        <option value="claude-haiku-4-5">claude-haiku-4-5 — cheapest</option>
+                      </select>
+                    </Row>
+                  </>
+                ) : (
+                  <>
+                    <Row name="Ollama URL" desc="Default is http://localhost:11434.">
+                      <Input
+                        value={ollamaUrl}
+                        onChange={(e) => setOllamaUrl(e.target.value)}
+                        placeholder="http://localhost:11434"
+                        className="mono"
+                      />
+                    </Row>
+                    <Row
+                      name="Model"
+                      desc="The model used to generate rule drafts. Refresh to list pulled models."
                     >
-                      {modelsError}
-                    </div>
-                  ) : null}
-                </Row>
+                      <div className="flex gap-2 items-center" style={{ minWidth: 0 }}>
+                        {models.length > 0 ? (
+                          <select
+                            value={ollamaModel}
+                            onChange={(e) => setOllamaModel(e.target.value)}
+                            className="input mono"
+                            style={{ flex: 1 }}
+                          >
+                            <option value="">— pick a pulled model —</option>
+                            {models.map((m) => (
+                              <option key={m.name} value={m.name}>
+                                {m.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <Input
+                            value={ollamaModel}
+                            onChange={(e) => setOllamaModel(e.target.value)}
+                            placeholder="qwen2.5-coder:14b"
+                            className="mono"
+                          />
+                        )}
+                        <button className="btn sm" onClick={loadModels} title="List Ollama models">
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      {modelsError ? (
+                        <div
+                          className="mono"
+                          style={{ marginTop: 6, fontSize: 11, color: "var(--danger)" }}
+                        >
+                          {modelsError}
+                        </div>
+                      ) : null}
+                    </Row>
+                  </>
+                )}
               </SettingsGroup>
             ) : null}
 

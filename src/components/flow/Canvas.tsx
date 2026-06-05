@@ -20,15 +20,64 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
   MarkerType,
+  type NodeProps,
 } from "@xyflow/react";
 import { useRuleStore } from "@/lib/store/rule-store";
 import { useNodesStore } from "@/lib/store/nodes-store";
 import { NodeView } from "./NodeView";
+import { GroupsControl } from "./GroupsControl";
 import { type PaletteDragPayload, PALETTE_DND_TYPE } from "./RightPalette";
 import type { EdgeBranch, RuleNodeInstance } from "@/lib/types";
 
+// A labelled box drawn behind a set of nodes — purely visual grouping.
+function GroupBoxNode({ data }: NodeProps) {
+  const d = data as { label: string; w: number; h: number; color?: string };
+  const color = d.color || "#6366f1";
+  return (
+    <div
+      style={{
+        width: d.w,
+        height: d.h,
+        border: `1.5px dashed ${color}`,
+        borderRadius: 14,
+        background: groupTint(color),
+        position: "relative",
+        pointerEvents: "none",
+      }}
+    >
+      <span
+        style={{
+          position: "absolute",
+          top: -11,
+          left: 14,
+          padding: "1px 9px",
+          fontSize: 11,
+          fontWeight: 600,
+          color,
+          background: "var(--panel)",
+          border: `1px solid ${color}`,
+          borderRadius: 999,
+          whiteSpace: "nowrap",
+        }}
+      >
+        {d.label}
+      </span>
+    </div>
+  );
+}
+
+function groupTint(hex: string): string {
+  if (!hex?.startsWith("#")) return "rgba(99, 102, 241, 0.05)";
+  let h = hex.slice(1);
+  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  if (h.length !== 6) return "rgba(99, 102, 241, 0.05)";
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, 0.05)`;
+}
+
 const nodeTypes = {
   ruleforgeNode: NodeView,
+  groupBox: GroupBoxNode,
 };
 
 function edgeStyle(branch: EdgeBranch | undefined, traversed: boolean) {
@@ -109,31 +158,62 @@ function CanvasInner() {
     return () => cancelAnimationFrame(raf);
   }, [flowDomNode, rule?.id, rule?.instances, nodeDefs, flowStoreApi]);
 
-  const rfNodes: RFNode[] = useMemo(
-    () =>
-      (rule?.instances ?? []).map((inst) => {
-        const def = nodeDefs.find((n) => n.id === inst.nodeId);
-        const isTerminal = def?.category === "input" || def?.category === "output";
-        // initialWidth/Height (NOT width/height) hint dimensions for the FIRST
-        // render so the node isn't visibility:hidden, but still lets React Flow's
-        // ResizeObserver replace them with actual measured DOM bounds — which
-        // is what triggers handle-bounds scanning. Setting `width`/`height`
-        // directly suppresses that and edges never compute endpoints.
-        const initialWidth = isTerminal ? 140 : 240;
-        const initialHeight = isTerminal ? 40 : 84;
-        return {
-          id: inst.instanceId,
-          type: "ruleforgeNode",
-          position: inst.position,
-          data: { instance: inst, def, bindings: rule?.bindings[inst.instanceId] },
-          draggable: true,
-          selected: selection.kind === "node" && selection.id === inst.instanceId,
-          initialWidth,
-          initialHeight,
-        };
-      }),
-    [rule?.instances, rule?.bindings, nodeDefs, selection],
-  );
+  const rfNodes: RFNode[] = useMemo(() => {
+    const instanceNodes: RFNode[] = (rule?.instances ?? []).map((inst) => {
+      const def = nodeDefs.find((n) => n.id === inst.nodeId);
+      const isTerminal = def?.category === "input" || def?.category === "output";
+      // initialWidth/Height (NOT width/height) hint dimensions for the FIRST
+      // render so the node isn't visibility:hidden, but still lets React Flow's
+      // ResizeObserver replace them with actual measured DOM bounds — which
+      // is what triggers handle-bounds scanning. Setting `width`/`height`
+      // directly suppresses that and edges never compute endpoints.
+      const initialWidth = isTerminal ? 140 : 240;
+      const initialHeight = isTerminal ? 40 : 84;
+      return {
+        id: inst.instanceId,
+        type: "ruleforgeNode",
+        position: inst.position,
+        data: { instance: inst, def, bindings: rule?.bindings[inst.instanceId] },
+        draggable: true,
+        selected: selection.kind === "node" && selection.id === inst.instanceId,
+        initialWidth,
+        initialHeight,
+      };
+    });
+
+    // Visual group boxes — a labelled rectangle enclosing member nodes, drawn
+    // behind everything (zIndex -1) and non-interactive. Computed from the
+    // members' positions + an estimated node size.
+    const groupNodes: RFNode[] = [];
+    for (const g of rule?.groups ?? []) {
+      const members = (rule?.instances ?? []).filter((i) => g.nodeIds.includes(i.instanceId));
+      if (members.length === 0) continue;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const m of members) {
+        const def = nodeDefs.find((n) => n.id === m.nodeId);
+        const isTerm = def?.category === "input" || def?.category === "output";
+        const w = isTerm ? 140 : 220;
+        const h = isTerm ? 40 : 96;
+        minX = Math.min(minX, m.position.x);
+        minY = Math.min(minY, m.position.y);
+        maxX = Math.max(maxX, m.position.x + w);
+        maxY = Math.max(maxY, m.position.y + h);
+      }
+      const PAD = 30, TOP = 14;
+      groupNodes.push({
+        id: `grp-${g.id}`,
+        type: "groupBox",
+        position: { x: minX - PAD, y: minY - PAD - TOP },
+        data: { label: g.label, w: maxX - minX + PAD * 2, h: maxY - minY + PAD * 2 + TOP, color: g.color },
+        draggable: false,
+        selectable: false,
+        deletable: false,
+        zIndex: -1,
+      });
+    }
+
+    return [...groupNodes, ...instanceNodes];
+  }, [rule?.instances, rule?.bindings, rule?.groups, nodeDefs, selection]);
 
   const rfEdges: RFEdge[] = useMemo(
     () =>
@@ -267,6 +347,18 @@ function CanvasInner() {
       if (payload.kind === "node") {
         const def = nodeDefs.find((n) => n.id === payload.nodeId);
         if (!def) return;
+        // Enforce a single input (start) and single output (end) per rule.
+        if (def.category === "input" || def.category === "output") {
+          const current = useRuleStore.getState().rule;
+          const already = (current?.instances ?? []).some((inst) => {
+            const d = nodeDefs.find((n) => n.id === inst.nodeId);
+            return d?.category === def.category;
+          });
+          if (already) {
+            console.warn(`This rule already has an ${def.category} node — only one is allowed.`);
+            return;
+          }
+        }
         newId = addInstance(payload.nodeId, position);
       } else if (payload.kind === "reference") {
         // Drop a reference: create a pre-wired lookup-node instance with
@@ -307,6 +399,7 @@ function CanvasInner() {
         fitViewOptions={{ padding: 0.2, maxZoom: 1.2 }}
         minZoom={0.2}
         maxZoom={2}
+        connectionRadius={30}
         defaultEdgeOptions={{
           type: "smoothstep",
           style: { stroke: "var(--border-strong)", strokeWidth: 1.6 },
@@ -338,6 +431,8 @@ function CanvasInner() {
           }}
         />
       </ReactFlow>
+
+      <GroupsControl />
 
       {/* Onboarding hint — fade in when canvas is just Input → Output */}
       {rule && rule.instances.length <= 2 ? (

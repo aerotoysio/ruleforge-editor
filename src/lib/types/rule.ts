@@ -129,6 +129,36 @@ export type RuleTest = {
  * NodeDef metadata (icon, ports, defaults) is NOT stored on the Rule — the editor
  * fetches /nodes/[nodeId].json on demand via the global library.
  */
+/**
+ * A labelled box drawn behind a set of node-instances — purely visual grouping
+ * to convey what a sub-section of the rule does. Has no engine effect.
+ */
+export type RuleGroup = {
+  id: string;
+  label: string;
+  /** instanceIds of the member nodes the box should enclose. */
+  nodeIds: string[];
+  /** Optional accent colour (hex, e.g. "#6366f1"). */
+  color?: string;
+};
+
+/**
+ * AI-authoring metadata — set when a rule is generated from a policy by Claude.
+ * Drives the review-first UI (per-node explanations, an end-to-end narrative,
+ * and clause citations back to the source policy). No engine effect.
+ */
+export type RuleAiMeta = {
+  sourcePolicyName?: string;
+  /** End-to-end technical narrative of what the rule does. */
+  narrative?: string;
+  /** instanceId → plain-English explanation of that node. */
+  nodeExplanations?: Record<string, string>;
+  /** Each node traced back to the policy clause it implements. */
+  citations?: { instanceId: string; clause: string; quote?: string }[];
+  generatedBy?: string;
+  generatedAt?: string;
+};
+
 export type Rule = {
   id: string;
   name: string;
@@ -173,6 +203,10 @@ export type Rule = {
   bindings: Record<string, import("./node-def").NodeBindings>;
   /** Per-rule test scenarios. */
   tests: RuleTest[];
+  /** Optional visual groupings (labelled boxes behind nodes). No engine effect. */
+  groups?: RuleGroup[];
+  /** AI-authoring metadata (narrative, per-node explanations, citations). */
+  aiMeta?: RuleAiMeta;
   updatedAt: string;
   updatedBy?: string;
 };

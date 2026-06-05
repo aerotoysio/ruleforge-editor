@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useTemplatesStore } from "@/lib/store/templates-store";
+import { useAssetsStore } from "@/lib/store/assets-store";
 import type {
+  Asset,
   JsonSchema,
   OutputTemplate,
   OutputTemplateField,
@@ -34,7 +36,32 @@ export function TemplateFillEditor({ value, onChange, inputSchema }: Props) {
     if (!loaded) load();
   }, [loaded, load]);
 
+  // Saved products ("assets") — a template + a set of pre-filled field values.
+  // Picking one loads its values as editable literals so the user only tweaks
+  // the variable bits (e.g. Price).
+  const assets = useAssetsStore((s) => s.assets);
+  const assetsLoaded = useAssetsStore((s) => s.loaded);
+  const loadAssets = useAssetsStore((s) => s.load);
+  const [pickedAssetId, setPickedAssetId] = useState("");
+  useEffect(() => {
+    if (!assetsLoaded) void loadAssets();
+  }, [assetsLoaded, loadAssets]);
+
   const tpl = templates.find((t) => t.id === value.templateId);
+
+  function applyAsset(assetId: string) {
+    setPickedAssetId(assetId);
+    if (!assetId) return;
+    const asset = assets.find((a) => a.id === assetId);
+    if (!asset) return;
+    const t = templates.find((tt) => tt.id === asset.templateId);
+    const fields: Record<string, PortBinding> = t ? seedFromDefaults(t.fields) : {};
+    const fieldNames = new Set((t?.fields ?? []).map((f) => f.name));
+    for (const [k, v] of Object.entries(asset.values ?? {})) {
+      if (!t || fieldNames.has(k)) fields[k] = { kind: "literal", value: v as unknown };
+    }
+    onChange({ kind: "template-fill", templateId: asset.templateId, fields });
+  }
 
   function setTemplate(id: string) {
     const next = templates.find((t) => t.id === id);
@@ -58,6 +85,36 @@ export function TemplateFillEditor({ value, onChange, inputSchema }: Props) {
 
   return (
     <div className="flex flex-col gap-3">
+      {/* Asset picker — optional shortcut: load a saved product's values */}
+      {assets.length > 0 ? (
+        <div className="grid grid-cols-[80px_1fr] gap-2 items-center">
+          <span className="text-[10.5px] uppercase tracking-wider text-muted-foreground/80 font-medium">
+            Asset
+          </span>
+          <div className="flex flex-col gap-1">
+            <select
+              value={pickedAssetId}
+              onChange={(e) => applyAsset(e.target.value)}
+              className="h-8 text-[12px] px-2 rounded border border-border bg-background"
+            >
+              <option value="">— start from a saved product (optional) —</option>
+              {groupAssetsByTemplate(assets, templates).map(([label, items]) => (
+                <optgroup key={label} label={label}>
+                  {items.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name ?? a.id}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+            <span className="text-[10.5px] text-muted-foreground/80 leading-snug">
+              Loads the product&apos;s saved values — then tweak any field (e.g. Price) below.
+            </span>
+          </div>
+        </div>
+      ) : null}
+
       {/* Template picker */}
       <div className="grid grid-cols-[80px_1fr] gap-2 items-center">
         <span className="text-[10.5px] uppercase tracking-wider text-muted-foreground/80 font-medium">
@@ -406,6 +463,18 @@ function fieldMatchesType(node: SchemaPathNode, want: OutputTemplateField["type"
   if (want === "object") return t === "object";
   if (want === "string-array" || want === "number-array" || want === "object-array") return t === "array";
   return true;
+}
+
+function groupAssetsByTemplate(assets: Asset[], templates: OutputTemplate[]): [string, Asset[]][] {
+  const nameOf = (id: string) => templates.find((t) => t.id === id)?.name ?? id;
+  const groups = new Map<string, Asset[]>();
+  for (const a of assets) {
+    const label = nameOf(a.templateId);
+    const arr = groups.get(label) ?? [];
+    arr.push(a);
+    groups.set(label, arr);
+  }
+  return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]));
 }
 
 function groupByCategory(items: OutputTemplate[]): [string, OutputTemplate[]][] {

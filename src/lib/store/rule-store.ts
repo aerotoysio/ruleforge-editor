@@ -11,6 +11,7 @@ import type {
   NodeBindings,
   PortBinding,
   RuleTest,
+  RuleGroup,
 } from "@/lib/types";
 
 export type Selection =
@@ -57,6 +58,10 @@ export type RuleState = {
   setTests: (tests: RuleTest[]) => void;
   upsertTest: (test: RuleTest) => void;
   removeTest: (testId: string) => void;
+
+  addGroup: (label: string, nodeIds: string[], color?: string) => string;
+  updateGroup: (id: string, patch: Partial<Omit<RuleGroup, "id">>) => void;
+  removeGroup: (id: string) => void;
 
   select: (sel: Selection) => void;
   setTrace: (t: TraceHighlight | null) => void;
@@ -194,6 +199,26 @@ export const useRuleStore = create<RuleState>((set, get) => ({
     const { rule } = get();
     if (!rule) return;
     set({ rule: { ...rule, tests: rule.tests.filter((t) => t.id !== testId) }, dirty: true });
+  },
+
+  addGroup: (label, nodeIds, color) => {
+    const { rule } = get();
+    if (!rule) return "";
+    const id = `g-${nanoid(6)}`;
+    const group: RuleGroup = { id, label, nodeIds, ...(color ? { color } : {}) };
+    set({ rule: { ...rule, groups: [...(rule.groups ?? []), group] }, dirty: true });
+    return id;
+  },
+  updateGroup: (id, patch) => {
+    const { rule } = get();
+    if (!rule) return;
+    const groups = (rule.groups ?? []).map((g) => (g.id === id ? { ...g, ...patch } : g));
+    set({ rule: { ...rule, groups }, dirty: true });
+  },
+  removeGroup: (id) => {
+    const { rule } = get();
+    if (!rule) return;
+    set({ rule: { ...rule, groups: (rule.groups ?? []).filter((g) => g.id !== id) }, dirty: true });
   },
 
   select: (sel) => set({ selection: sel }),

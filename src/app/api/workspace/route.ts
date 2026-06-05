@@ -34,6 +34,9 @@ export async function POST(req: NextRequest) {
     documentForgeUrl?: string | null;
     ollamaUrl?: string | null;
     ollamaModel?: string | null;
+    aiProvider?: "ollama" | "anthropic" | null;
+    anthropicApiKey?: string | null;
+    anthropicModel?: string | null;
     seed?: boolean;
   };
 
@@ -68,6 +71,9 @@ export async function POST(req: NextRequest) {
     documentForgeUrl: body.documentForgeUrl ?? undefined,
     ollamaUrl: body.ollamaUrl ?? undefined,
     ollamaModel: body.ollamaModel ?? undefined,
+    aiProvider: body.aiProvider ?? undefined,
+    anthropicApiKey: body.anthropicApiKey ?? undefined,
+    anthropicModel: body.anthropicModel ?? undefined,
   });
 
   let workspace = null;

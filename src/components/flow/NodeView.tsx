@@ -21,6 +21,8 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
   const requestEdit = useRuleStore((s) => s.requestEdit);
   const removeInstance = useRuleStore((s) => s.removeInstance);
   const outcome = trace?.nodeOutcomes[id];
+  // AI-authored plain-English description of this node (review-first display).
+  const explanation = useRuleStore((s) => s.rule?.aiMeta?.nodeExplanations?.[id]);
 
   const category = def?.category ?? "filter";
   const isTerminal = category === "input" || category === "output";
@@ -131,8 +133,8 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
             position={Position.Left}
             style={{
               background: "var(--panel)",
-              width: 10,
-              height: 10,
+              width: 14,
+              height: 14,
               border: `2px solid ${selected ? "var(--accent)" : "var(--border-strong)"}`,
               left: -6,
             }}
@@ -172,8 +174,8 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
             position={Position.Right}
             style={{
               background: "var(--panel)",
-              width: 10,
-              height: 10,
+              width: 14,
+              height: 14,
               border: `2px solid ${selected ? "var(--accent)" : "var(--border-strong)"}`,
               right: -6,
             }}
@@ -230,8 +232,8 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
           position={Position.Left}
           style={{
             background: "var(--panel)",
-            width: 10,
-            height: 10,
+            width: 14,
+            height: 14,
             border: `2px solid ${selected ? "var(--accent)" : "var(--border-strong)"}`,
             left: -6,
           }}
@@ -354,7 +356,7 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
               cursor: "text",
               lineHeight: 1.3,
               wordBreak: "break-word",
-              marginBottom: userDescription || summary ? 4 : 0,
+              marginBottom: userDescription || explanation || summary ? 4 : 0,
             }}
             title="Double-click to rename"
             onDoubleClick={(e) => { e.stopPropagation(); startEdit(e); }}
@@ -374,6 +376,18 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
             title={userDescription}
           >
             {userDescription}
+          </div>
+        ) : explanation ? (
+          <div
+            className="line-clamp-3"
+            style={{
+              fontSize: 11.5,
+              color: "var(--text-muted)",
+              lineHeight: 1.4,
+            }}
+            title={explanation}
+          >
+            {explanation}
           </div>
         ) : summary ? (
           <div
@@ -405,8 +419,10 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
                     out.branch === "pass" ? "var(--color-pass)"
                     : out.branch === "fail" ? "var(--color-fail)"
                     : "var(--color-default)";
-                  // Vertical positions: 30%, 70% for two handles; evenly spaced for more.
-                  const top = `${((i + 1) * 100) / (outputs.length + 1)}%`;
+                  // Fixed offsets below the header + top-right toolbar so the
+                  // pass/fail handles and their labels never collide with the
+                  // configure/delete icons.
+                  const top = `${40 + i * 28}px`;
                   return (
                     <div key={out.name}>
                       <Handle
@@ -416,8 +432,8 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
                         style={{
                           top,
                           background: "var(--panel)",
-                          width: 10,
-                          height: 10,
+                          width: 14,
+                          height: 14,
                           border: `2px solid ${colour}`,
                           right: -6,
                         }}
@@ -441,8 +457,8 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
               position={Position.Right}
               style={{
                 background: "var(--panel)",
-                width: 10,
-                height: 10,
+                width: 14,
+                height: 14,
                 border: `2px solid ${selected ? "var(--accent)" : "var(--border-strong)"}`,
                 right: -6,
               }}

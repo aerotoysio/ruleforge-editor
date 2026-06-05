@@ -6,13 +6,17 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
 import { useRuleStore } from "@/lib/store/rule-store";
 import { useNodesStore } from "@/lib/store/nodes-store";
 import { useReferencesStore } from "@/lib/store/references-store";
+import { useTemplatesStore } from "@/lib/store/templates-store";
+import { useAssetsStore } from "@/lib/store/assets-store";
+import { compileRuleForEngine, CompileError } from "@/lib/rule/compile-to-engine";
+import { CalcExpressionEditor, type CalcVar } from "./CalcExpressionEditor";
 import { ShuttlePicker, type ShuttleItem } from "./ShuttlePicker";
 import { DateBindingPicker } from "./DateBindingPicker";
 import { MarketsPicker } from "./MarketsPicker";
 import { TemplateFillEditor } from "./TemplateFillEditor";
 import { walkSchema, type SchemaPathNode } from "@/lib/schema/path-walker";
 import { cn } from "@/lib/utils";
-import type { JsonSchema, NodePort, PortBinding } from "@/lib/types";
+import type { Asset, JsonSchema, NodeDef, NodePort, OutputTemplate, PortBinding, ReferenceSet, Rule } from "@/lib/types";
 
 type Props = {
   open: boolean;
@@ -39,6 +43,12 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
   const updateInstance = useRuleStore((s) => s.updateInstance);
   const removeInstance = useRuleStore((s) => s.removeInstance);
   const select = useRuleStore((s) => s.select);
+  const references = useReferencesStore((s) => s.references);
+  const templates = useTemplatesStore((s) => s.templates);
+  const assets = useAssetsStore((s) => s.assets);
+  const loadRefs = useReferencesStore((s) => s.load);
+  const loadTemplates = useTemplatesStore((s) => s.load);
+  const loadAssets = useAssetsStore((s) => s.load);
 
   const instance = rule?.instances.find((i) => i.instanceId === instanceId);
   const def = instance ? nodeDefs.find((n) => n.id === instance.nodeId) : undefined;
@@ -50,6 +60,8 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
   const [labelDraft, setLabelDraft] = useState<string>(instance?.label ?? "");
   const [descriptionDraft, setDescriptionDraft] = useState<string>(instance?.description ?? "");
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [tab, setTab] = useState<"form" | "raw">("form");
+  const [extrasDraft, setExtrasDraft] = useState<Record<string, unknown>>((initialBindings?.extras as Record<string, unknown>) ?? {});
 
   useEffect(() => {
     if (open) {
@@ -57,8 +69,13 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
       setLabelDraft(instance?.label ?? "");
       setDescriptionDraft(instance?.description ?? "");
       setAdvancedOpen(false);
+      setTab("form");
+      setExtrasDraft((initialBindings?.extras as Record<string, unknown>) ?? {});
+      loadRefs();
+      loadTemplates();
+      loadAssets();
     }
-  }, [open, initialBindings, instance?.label, instance?.description]);
+  }, [open, initialBindings, instance?.label, instance?.description, loadRefs, loadTemplates, loadAssets]);
 
   if (!rule || !instance || !def) return null;
 
@@ -84,7 +101,7 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
       instanceId,
       ruleId: rule!.id,
       bindings: draft,
-      extras: initialBindings?.extras,
+      extras: extrasDraft,
     });
     const trimmedLabel = labelDraft.trim();
     const trimmedDesc = descriptionDraft.trim();
@@ -102,6 +119,7 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
   // would otherwise silently discard the draft.
   const hasUnsavedChanges =
     !shallowEqualBindings(draft, initialBindings?.bindings ?? {}) ||
+    JSON.stringify(extrasDraft ?? {}) !== JSON.stringify((initialBindings?.extras as Record<string, unknown>) ?? {}) ||
     (instance.label ?? "") !== labelDraft.trim() ||
     (instance.description ?? "") !== descriptionDraft.trim();
 
@@ -115,6 +133,8 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
 
   const accent = def.ui?.accent ?? "#64748b";
   const badge = def.ui?.badge ?? "?";
+  const calcVariables = deriveCalcVariables(rule, instanceId);
+  const objectFieldNames = calcVariables.filter((v) => v.source === "field").map((v) => v.name);
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) tryClose(); }}>
@@ -136,6 +156,30 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
           </div>
         </header>
 
+        <div style={{ display: "flex", gap: 4, padding: "8px 18px 0", borderBottom: "1px solid var(--border)" }}>
+          {(["form", "raw"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTab(t)}
+              style={{
+                padding: "7px 14px",
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+                background: "transparent",
+                border: 0,
+                marginBottom: -1,
+                borderBottom: tab === t ? `2px solid ${accent}` : "2px solid transparent",
+                color: tab === t ? "var(--text)" : "#94a3b8",
+              }}
+            >
+              {t === "form" ? "Form" : "Raw rule"}
+            </button>
+          ))}
+        </div>
+
+        {tab === "form" && (
         <div className="popup-body">
           {/* Identity — label + description. These travel with the node-instance
               (not the bindings), so a third-party reading the canvas can scan
@@ -165,23 +209,139 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
 
           {primary.length === 0 && advanced.length === 0 ? (
             <div className="struct-rows-empty">
-              <strong style={{ color: "var(--text)" }}>No ports to wire up</strong>
-              <div style={{ marginTop: 4 }}>
-                This node has no configurable ports — it works the same in every rule.
-                Edit its label/description above, or remove it via the Delete button below.
-              </div>
+              <strong style={{ color: "var(--text)" }}>{noConfigBlurb(def).title}</strong>
+              <div style={{ marginTop: 4 }}>{noConfigBlurb(def).body}</div>
             </div>
           ) : null}
 
-          {primary.map((port) => (
-            <PortSection
-              key={port.name}
-              port={port}
-              binding={draft[port.name]}
-              onChange={(b) => setBinding(port.name, b)}
-              inputSchema={rule.inputSchema}
-            />
-          ))}
+          {primary.map((port) => {
+            if (port.name === "matchOn") {
+              return (
+                <section className="field-group" key={port.name}>
+                  <span className="field-label">
+                    {humanLabel(port.name)}
+                    {port.required ? <span className="req-pill">req</span> : null}
+                  </span>
+                  <p className="field-hint">
+                    Which reference column must equal which request value to pick a row. Add one row per column to match on.
+                  </p>
+                  <KeySourceMapEditor
+                    referenceId={referenceIdOf(draft.referenceId)}
+                    value={(extrasDraft.matchOn as Record<string, PortBinding>) ?? {}}
+                    onChange={(next) => setExtrasDraft((prev) => ({ ...prev, matchOn: next }))}
+                    inputSchema={rule.inputSchema}
+                    keyMode="ref"
+                    keyPlaceholder="column"
+                    addLabel="+ Add match key"
+                    emptyLabel="No match keys yet — add one per reference column to match on."
+                  />
+                </section>
+              );
+            }
+            if (port.name === "fields") {
+              return (
+                <section className="field-group" key={port.name}>
+                  <span className="field-label">
+                    {humanLabel(port.name)}
+                    {port.required ? <span className="req-pill">req</span> : null}
+                  </span>
+                  <p className="field-hint">
+                    Set several fields at once — one row per field, each from a request field, a loop/context value, or a literal. Replaces a chain of single Set nodes.
+                  </p>
+                  <KeySourceMapEditor
+                    value={(extrasDraft.fields as Record<string, PortBinding>) ?? {}}
+                    onChange={(next) => setExtrasDraft((prev) => ({ ...prev, fields: next }))}
+                    inputSchema={rule.inputSchema}
+                    keyMode="free"
+                    keyPlaceholder="fieldName"
+                    addLabel="+ Add field"
+                    emptyLabel="No fields yet — add one per field you want to set."
+                  />
+                </section>
+              );
+            }
+            if (port.name === "inputMapping" || port.name === "outputMapping" || port.name === "headers" || port.name === "responseMap") {
+              const isMapping = port.name === "inputMapping" || port.name === "outputMapping";
+              return (
+                <section className="field-group" key={port.name}>
+                  <span className="field-label">
+                    {humanLabel(port.name)}
+                    {port.required ? <span className="req-pill">req</span> : null}
+                  </span>
+                  <p className="field-hint">
+                    {port.description ?? (isMapping
+                      ? "Map each field name to where its value comes from (a path like $.x)."
+                      : "Key → value pairs.")}
+                  </p>
+                  <StringMapEditor
+                    value={draft[port.name]}
+                    onChange={(b) => setBinding(port.name, b)}
+                    keyPlaceholder={isMapping ? "targetField" : "Header-Name"}
+                    valuePlaceholder={isMapping ? "$.source.path" : "value"}
+                    addLabel={isMapping ? "+ Add mapping" : "+ Add row"}
+                    emptyLabel={isMapping ? "No mappings yet — add one per field." : "No entries yet."}
+                  />
+                </section>
+              );
+            }
+            if ((port.name === "expression" && def.category === "calc") || (port.name === "condition" && def.category === "assert")) {
+              const exprB = draft[port.name];
+              const exprVal = exprB?.kind === "literal" && typeof exprB.value === "string" ? exprB.value : "";
+              return (
+                <section className="field-group" key={port.name}>
+                  <span className="field-label">
+                    {humanLabel(port.name)}
+                    {port.required ? <span className="req-pill">req</span> : null}
+                  </span>
+                  <p className="field-hint">
+                    {def.category === "assert"
+                      ? "A condition that must be true, or the rule fails with your error. Reference fields by name; click a variable, function or operator to build it."
+                      : "Reference fields by name; the result is written to the target field. Click a variable, function or operator to build it."}
+                  </p>
+                  <CalcExpressionEditor
+                    value={exprVal}
+                    onChange={(s) => setBinding(port.name, { kind: "literal", value: s })}
+                    variables={calcVariables}
+                  />
+                </section>
+              );
+            }
+            if (port.name === "target") {
+              return (
+                <section className="field-group" key={port.name}>
+                  <span className="field-label">
+                    {humanLabel(port.name)}
+                    {port.required ? <span className="req-pill">req</span> : null}
+                  </span>
+                  <p className="field-hint">
+                    {port.description ?? "Name of the field on the current record to write into — a new field name is fine."}
+                  </p>
+                  <input
+                    className="input mono"
+                    style={{ fontFamily: "var(--font-mono)" }}
+                    list={`fields-${instanceId}`}
+                    value={draft.target?.kind === "literal" && typeof draft.target.value === "string" ? draft.target.value : ""}
+                    onChange={(e) => setBinding("target", { kind: "literal", value: e.target.value })}
+                    placeholder="fieldName"
+                  />
+                  <datalist id={`fields-${instanceId}`}>
+                    {objectFieldNames.map((f) => (
+                      <option key={f} value={f} />
+                    ))}
+                  </datalist>
+                </section>
+              );
+            }
+            return (
+              <PortSection
+                key={port.name}
+                port={port}
+                binding={draft[port.name]}
+                onChange={(b) => setBinding(port.name, b)}
+                inputSchema={rule.inputSchema}
+              />
+            );
+          })}
 
           {advanced.length > 0 ? (
             <div style={{ borderTop: "1px solid var(--border)", paddingTop: 14 }}>
@@ -210,6 +370,24 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
             </div>
           ) : null}
         </div>
+        )}
+
+        {tab === "raw" && (
+          <div className="popup-body">
+            <RawTab
+              instance={instance}
+              label={labelDraft}
+              description={descriptionDraft}
+              draft={draft}
+              extras={extrasDraft}
+              rule={rule}
+              nodeDefs={nodeDefs}
+              refs={references}
+              templates={templates}
+              assets={assets}
+            />
+          </div>
+        )}
 
         <footer className="popup-foot">
           <button
@@ -244,6 +422,119 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
         </footer>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ------------------------------------------------------------------
+// Raw tab — live editor-source + compiled-engine view of THIS node.
+// Lets the author see the rule behind the form and confirm the form is
+// producing the bindings (and engine config) they expect. Compile errors
+// surface here too, so a half-wired node is obvious before Save.
+// ------------------------------------------------------------------
+
+function RawTab({
+  instance,
+  label,
+  description,
+  draft,
+  extras,
+  rule,
+  nodeDefs,
+  refs,
+  templates,
+  assets,
+}: {
+  instance: { instanceId: string; nodeId: string; position: { x: number; y: number } };
+  label: string;
+  description: string;
+  draft: Record<string, PortBinding>;
+  extras: Record<string, unknown> | undefined;
+  rule: Rule;
+  nodeDefs: NodeDef[];
+  refs: ReferenceSet[];
+  templates: OutputTemplate[];
+  assets: Asset[];
+}) {
+  const editorSource = {
+    instance: {
+      instanceId: instance.instanceId,
+      nodeId: instance.nodeId,
+      label: label.trim() || undefined,
+      description: description.trim() || undefined,
+      position: instance.position,
+    },
+    bindings: { bindings: draft, ...(extras ? { extras } : {}) },
+  };
+
+  const { engineNode, compileError } = useMemo(() => {
+    try {
+      const mini: Rule = {
+        ...rule,
+        instances: [
+          {
+            instanceId: instance.instanceId,
+            nodeId: instance.nodeId,
+            position: instance.position,
+            label: label.trim() || undefined,
+            description: description.trim() || undefined,
+          },
+        ],
+        edges: [],
+        bindings: {
+          [instance.instanceId]: {
+            instanceId: instance.instanceId,
+            ruleId: rule.id,
+            bindings: draft,
+            extras,
+          },
+        },
+      };
+      const compiled = compileRuleForEngine(mini, nodeDefs, { refs, templates, assets });
+      return { engineNode: compiled.nodes[0] ?? null, compileError: null as string | null };
+    } catch (e) {
+      const msg = e instanceof CompileError ? e.message : (e as Error).message;
+      return { engineNode: null, compileError: msg };
+    }
+  }, [rule, instance, label, description, draft, extras, nodeDefs, refs, templates, assets]);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="field-hint">
+        Live, read-only view of this node as you edit it.{" "}
+        <strong style={{ color: "var(--text)" }}>Editor source</strong> is what gets saved to the workspace;{" "}
+        <strong style={{ color: "var(--text)" }}>Engine</strong> is what the rules engine actually runs after compile.
+      </p>
+
+      <section className="field-group">
+        <span className="field-label">Editor source (this node)</span>
+        <textarea
+          className="json-input"
+          readOnly
+          rows={12}
+          style={{ fontFamily: "var(--font-mono)" }}
+          value={JSON.stringify(editorSource, null, 2)}
+        />
+      </section>
+
+      <section className="field-group">
+        <span className="field-label">Engine — compiled config</span>
+        {compileError ? (
+          <div className="struct-rows-empty" style={{ color: "var(--warn, #d97706)", whiteSpace: "pre-wrap" }}>
+            <strong>Does not compile yet</strong>
+            {"\n"}
+            {compileError}
+          </div>
+        ) : (
+          <textarea
+            className="json-input"
+            readOnly
+            rows={12}
+            style={{ fontFamily: "var(--font-mono)" }}
+            value={JSON.stringify(engineNode, null, 2)}
+          />
+        )}
+      </section>
+    </div>
   );
 }
 
@@ -382,6 +673,16 @@ function PortEditor({
           port={port}
           value={binding?.kind === "path" ? binding.path : ""}
           onPick={(p) => onChange({ kind: "path", path: p })}
+        />
+      );
+    }
+    if (port.type === "string" && port.bindingKinds?.includes("literal")) {
+      return (
+        <input
+          className="input"
+          value={binding?.kind === "literal" && typeof binding.value === "string" ? binding.value : ""}
+          onChange={(e) => onChange({ kind: "literal", value: e.target.value })}
+          placeholder="value"
         />
       );
     }
@@ -1144,6 +1445,257 @@ function RowCell({
   );
 }
 
+// ------------------------------------------------------------------
+// matchOn editor — the reference lookup's "which columns equal which
+// request values" map. Stored in the binding's `extras.matchOn` (a
+// Record<column, source>), so it needs its own editor rather than a
+// single port binding.
+// ------------------------------------------------------------------
+
+// Derive the variables a calc expression can reference in THIS rule: request
+// top-level fields, record fields built upstream (constant shells + mutator/calc
+// targets), and loop variables from iterators. Mirrors the engine's resolver
+// namespaces so the palette only offers names that will actually resolve.
+function deriveCalcVariables(rule: Rule, selfInstanceId: string): CalcVar[] {
+  const seen = new Map<string, CalcVar["source"]>();
+  const add = (name: string, source: CalcVar["source"]) => {
+    if (!name) return;
+    const existing = seen.get(name);
+    if (existing && existing !== "request") return; // don't downgrade field/loop → request
+    seen.set(name, source);
+  };
+
+  const props = (rule.inputSchema?.properties ?? {}) as Record<string, unknown>;
+  for (const k of Object.keys(props)) add(k, "request");
+
+  for (const inst of rule.instances) {
+    const b = (rule.bindings[inst.instanceId]?.bindings ?? {}) as Record<string, PortBinding>;
+    if (inst.instanceId !== selfInstanceId) {
+      const t = b.target;
+      if (t?.kind === "literal" && typeof t.value === "string") add(t.value, "field");
+      const v = b.value ?? b.literal;
+      if (v?.kind === "literal" && v.value && typeof v.value === "object" && !Array.isArray(v.value)) {
+        for (const k of Object.keys(v.value as Record<string, unknown>)) add(k, "field");
+      }
+      const ex = (rule.bindings[inst.instanceId]?.extras ?? {}) as Record<string, unknown>;
+      const fm = ex.fields;
+      if (fm && typeof fm === "object" && !Array.isArray(fm)) {
+        for (const k of Object.keys(fm as Record<string, unknown>)) add(k, "field");
+      }
+    }
+    const as = b.as;
+    if (as?.kind === "literal" && typeof as.value === "string") {
+      add(as.value, "loop");
+      add(`${as.value}Index`, "loop");
+      add(`${as.value}Count`, "loop");
+    }
+  }
+
+  return [...seen.entries()]
+    .map(([name, source]) => ({ name, source }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// Friendly explanation for nodes with no configurable ports — so the dialog
+// "signifies" what a settings-less node does (e.g. the OR operator) instead of
+// a bare "nothing here".
+// Simple key → string-value map editor, stored as a literal object binding.
+// Used for sub-rule input/output mappings and api headers / responseMap —
+// friendlier than hand-editing raw JSON.
+function StringMapEditor({
+  value,
+  onChange,
+  keyPlaceholder = "key",
+  valuePlaceholder = "value",
+  addLabel = "+ Add row",
+  emptyLabel = "No rows yet.",
+}: {
+  value: PortBinding | undefined;
+  onChange: (b: PortBinding | null) => void;
+  keyPlaceholder?: string;
+  valuePlaceholder?: string;
+  addLabel?: string;
+  emptyLabel?: string;
+}) {
+  const obj: Record<string, unknown> =
+    value?.kind === "literal" && value.value && typeof value.value === "object" && !Array.isArray(value.value)
+      ? (value.value as Record<string, unknown>)
+      : {};
+  const entries = Object.entries(obj);
+
+  function emit(next: Record<string, unknown>) {
+    if (Object.keys(next).length === 0) onChange(null);
+    else onChange({ kind: "literal", value: next });
+  }
+  function setVal(key: string, v: string) { emit({ ...obj, [key]: v }); }
+  function renameKey(oldK: string, newK: string) {
+    if (oldK === newK) return;
+    const next: Record<string, unknown> = {};
+    for (const [k, val] of entries) next[k === oldK ? newK : k] = val;
+    emit(next);
+  }
+  function removeRow(key: string) { const next = { ...obj }; delete next[key]; emit(next); }
+  function addRow() { emit({ ...obj, "": "" }); }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {entries.length === 0 ? <div className="struct-rows-empty">{emptyLabel}</div> : null}
+      {entries.map(([k, v], i) => (
+        <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 28px", gap: 8, alignItems: "center" }}>
+          <input className="input mono" style={{ fontFamily: "var(--font-mono)" }} value={k} onChange={(e) => renameKey(k, e.target.value)} placeholder={keyPlaceholder} />
+          <input className="input mono" style={{ fontFamily: "var(--font-mono)" }} value={typeof v === "string" ? v : JSON.stringify(v)} onChange={(e) => setVal(k, e.target.value)} placeholder={valuePlaceholder} />
+          <button type="button" className="x" title="Remove row" aria-label="Remove row" onClick={() => removeRow(k)}>×</button>
+        </div>
+      ))}
+      <button type="button" className="btn ghost sm" style={{ alignSelf: "flex-start" }} onClick={addRow}>{addLabel}</button>
+    </div>
+  );
+}
+
+function noConfigBlurb(def: NodeDef): { title: string; body: string } {
+  if (def.category === "logic") {
+    const op = (def.id || "").replace("node-logic-", "");
+    const map: Record<string, { title: string; body: string }> = {
+      and: { title: "AND — no settings needed", body: "Passes only when ALL incoming branches pass. Connect two or more nodes into it." },
+      or:  { title: "OR — no settings needed",  body: "Passes when ANY incoming branch passes. Connect two or more nodes into it." },
+      xor: { title: "XOR — no settings needed", body: "Passes when EXACTLY ONE incoming branch passes. Connect two or more nodes into it." },
+      not: { title: "NOT — no settings needed", body: "Inverts the incoming branch: a pass becomes a fail and vice-versa. Connect a single node into it." },
+    };
+    return map[op] ?? { title: "Logic — no settings needed", body: "Combines its incoming pass/fail branches. Nothing to configure." };
+  }
+  if (def.category === "input") return { title: "Start — no settings needed", body: "The rule's request enters the graph here. Connect it to your first step." };
+  if (def.category === "output") return { title: "Result — no settings needed", body: "Whatever reaches this node becomes the rule's output. Connect your final step into it." };
+  return { title: "No settings needed", body: "This node has no configurable ports — it works the same in every rule." };
+}
+
+function referenceIdOf(b: PortBinding | undefined): string | undefined {
+  if (!b) return undefined;
+  if (b.kind === "reference") return b.referenceId;
+  if (b.kind === "literal" && typeof b.value === "string") return b.value;
+  return undefined;
+}
+
+function KeySourceMapEditor({
+  referenceId,
+  value,
+  onChange,
+  inputSchema,
+  keyMode = "ref",
+  keyPlaceholder = "key",
+  addLabel = "+ Add row",
+  emptyLabel = "No rows yet.",
+}: {
+  referenceId?: string;
+  value: Record<string, PortBinding>;
+  onChange: (next: Record<string, PortBinding>) => void;
+  inputSchema: JsonSchema;
+  keyMode?: "ref" | "free";
+  keyPlaceholder?: string;
+  addLabel?: string;
+  emptyLabel?: string;
+}) {
+  const refs = useReferencesStore((s) => s.references);
+  const ref = refs.find((r) => r.id === referenceId);
+  const cols = keyMode === "ref" ? (ref?.columns ?? []) : [];
+  const entries = Object.entries(value);
+  const usedCols = entries.map(([c]) => c);
+  const freeCols = cols.filter((c) => !usedCols.includes(c));
+
+  function setRow(col: string, b: PortBinding) {
+    onChange({ ...value, [col]: b });
+  }
+  function renameRow(oldCol: string, newCol: string) {
+    if (oldCol === newCol) return;
+    const next: Record<string, PortBinding> = {};
+    for (const [k, v] of entries) next[k === oldCol ? newCol : k] = v;
+    onChange(next);
+  }
+  function removeRow(col: string) {
+    const next = { ...value };
+    delete next[col];
+    onChange(next);
+  }
+  function addRow() {
+    const col = keyMode === "ref" ? (freeCols[0] ?? "") : "";
+    onChange({ ...value, [col]: { kind: "path", path: "" } });
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      {keyMode === "ref" && !referenceId ? (
+        <div className="struct-rows-empty">Choose a reference table above to see its columns.</div>
+      ) : null}
+      {entries.length === 0 ? (
+        <div className="struct-rows-empty">{emptyLabel}</div>
+      ) : null}
+      {entries.map(([col, binding]) => (
+        <div key={col} style={{ display: "grid", gridTemplateColumns: "150px 1fr 28px", gap: 8, alignItems: "start" }}>
+          {cols.length > 0 ? (
+            <select className="input" value={col} onChange={(e) => renameRow(col, e.target.value)}>
+              {!cols.includes(col) ? <option value={col}>{col || "— column —"}</option> : null}
+              {cols.map((c) => (
+                <option key={c} value={c} disabled={c !== col && usedCols.includes(c)}>{c}</option>
+              ))}
+            </select>
+          ) : (
+            <input className="input mono" style={{ fontFamily: "var(--font-mono)" }} value={col} onChange={(e) => renameRow(col, e.target.value)} placeholder={keyPlaceholder} />
+          )}
+          <SourceField binding={binding} onChange={(b) => setRow(col, b)} inputSchema={inputSchema} />
+          <button type="button" className="x" title="Remove this match key" aria-label="Remove match key" onClick={() => removeRow(col)}>×</button>
+        </div>
+      ))}
+      <button type="button" className="btn ghost sm" style={{ alignSelf: "flex-start" }} onClick={addRow}>{addLabel}</button>
+    </div>
+  );
+}
+
+// A compact value-source control: request field, iteration/context path, or
+// literal. Reusable anywhere a single value can come from multiple places
+// (matchOn rows today; sub-rule mappings / api headers next).
+function SourceField({
+  binding,
+  onChange,
+  inputSchema,
+}: {
+  binding: PortBinding | undefined;
+  onChange: (b: PortBinding) => void;
+  inputSchema: JsonSchema;
+}) {
+  const kind = binding?.kind === "context" ? "context" : binding?.kind === "literal" ? "literal" : "field";
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="pill-toggle">
+        <button type="button" className={cn(kind === "field" && "on")} onClick={() => onChange({ kind: "path", path: binding?.kind === "path" ? binding.path : "" })}>Field</button>
+        <button type="button" className={cn(kind === "context" && "on")} onClick={() => onChange({ kind: "context", key: binding?.kind === "context" ? binding.key : "" })}>Loop / context</button>
+        <button type="button" className={cn(kind === "literal" && "on")} onClick={() => onChange({ kind: "literal", value: binding?.kind === "literal" ? binding.value : "" })}>Literal</button>
+      </div>
+      {kind === "field" ? (
+        <SchemaFieldPicker
+          schema={inputSchema}
+          port={{ name: "matchValue", type: "any" } as NodePort}
+          value={binding?.kind === "path" ? binding.path : ""}
+          onPick={(p) => onChange({ kind: "path", path: p })}
+        />
+      ) : kind === "context" ? (
+        <input
+          className="input mono"
+          style={{ fontFamily: "var(--font-mono)" }}
+          value={binding?.kind === "context" ? binding.key : ""}
+          onChange={(e) => onChange({ kind: "context", key: e.target.value })}
+          placeholder="$pax.ageCategory  or  $ctx.myKey"
+        />
+      ) : (
+        <input
+          className="input"
+          value={binding?.kind === "literal" && (typeof binding.value === "string" || typeof binding.value === "number") ? String(binding.value) : ""}
+          onChange={(e) => onChange({ kind: "literal", value: e.target.value })}
+          placeholder="fixed value"
+        />
+      )}
+    </div>
+  );
+}
+
 function shallowEqualBindings(a: Record<string, PortBinding>, b: Record<string, PortBinding>): boolean {
   const ka = Object.keys(a);
   const kb = Object.keys(b);
@@ -1167,8 +1719,11 @@ function humanLabel(portName: string): string {
     target: "Field to update",
     from: "Where the value comes from",
     expression: "Expression",
+    condition: "Condition (must be true)",
     referenceId: "Reference table",
     valueColumn: "Column to copy",
+    matchOn: "Match on",
+    fields: "Set fields",
     onMissing: "When the field is missing",
     arraySelector: "When source has multiple values",
     caseInsensitive: "Ignore upper/lower case",
@@ -1176,6 +1731,40 @@ function humanLabel(portName: string): string {
     mode: "How to combine",
     as: "Loop variable name",
     value: "Value",
+    operator: "Test",
+    sortKey: "Sort by (field)",
+    direction: "Direction",
+    nulls: "Put blanks",
+    count: "Keep how many",
+    offset: "Skip first",
+    key: "Unique by (field)",
+    keep: "Keep which",
+    groupKey: "Group by (field)",
+    input: "Value to switch on",
+    cases: "Cases",
+    default: "Default value",
+    hashKey: "Split key",
+    buckets: "Buckets",
+    round: "Rounding",
+    granularity: "Compare precision",
+    timezone: "Timezone",
+    fromInclusive: "Include the 'from' value",
+    toInclusive: "Include the 'to' value",
+    errorCode: "Error code",
+    errorMessage: "Error message",
+    ruleId: "Sub-rule to call",
+    version: "Pinned version",
+    pinnedVersion: "Pinned version",
+    payload: "Input to the sub-rule",
+    inputMapping: "Map inputs (field → source)",
+    outputMapping: "Map outputs (field → source)",
+    onError: "If the sub-rule errors",
+    url: "URL",
+    method: "Method",
+    timeoutMs: "Timeout (ms)",
+    headers: "Headers",
+    body: "Body",
+    responseMap: "Map the response",
   };
   return map[portName] ?? portName;
 }

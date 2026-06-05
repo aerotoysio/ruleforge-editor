@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Workflow, Braces, FlaskConical } from "lucide-react";
+import { Workflow, Braces, FlaskConical, BookOpen } from "lucide-react";
 import type { Rule, RuleTest } from "@/lib/types";
 import { useRuleStore } from "@/lib/store/rule-store";
 import { useReferencesStore } from "@/lib/store/references-store";
@@ -12,9 +12,10 @@ import { Toolbar } from "@/components/flow/Toolbar";
 import { TestPanel } from "@/components/flow/TestPanel";
 import { RightPalette } from "@/components/flow/RightPalette";
 import { SettingsSheet } from "@/components/designer/SettingsSheet";
-import { AiDraftSheet } from "@/components/flow/AiDraftSheet";
+import { AiDraftBar } from "@/components/flow/AiDraftBar";
 import { RuleSchemaTab } from "@/components/flow/RuleSchemaTab";
 import { RuleTestsTab } from "@/components/flow/RuleTestsTab";
+import { RuleSummaryTab } from "@/components/flow/RuleSummaryTab";
 import { NodeConfigDialog } from "@/components/bindings/NodeConfigDialog";
 import { cn } from "@/lib/utils";
 
@@ -22,16 +23,22 @@ import { cn } from "@/lib/utils";
 // Terminal nodes (input/output) don't open a dialog — they have nothing to
 // configure beyond the inline label-edit on canvas. Everything else uses the
 // dialog so the side sheet's job becomes purely metadata browsing.
+// The unified node dialog is the single editor for every node category — one
+// consistent form (with the Raw tab, matchOn editor, calc builder, structured
+// rows and no-config signposting) rather than a separate per-category panel.
 const UNIFIED_DIALOG_CATEGORIES = new Set([
   "filter", "mutator", "calc", "iterator", "merge", "constant", "ruleRef",
+  "product", "logic", "assert", "switch", "bucket", "sort", "limit",
+  "distinct", "groupBy", "reference", "api", "input", "output",
 ]);
 
-type Tab = "graph" | "schema" | "tests";
+type Tab = "graph" | "summary" | "schema" | "tests";
 
 const TABS: { id: Tab; label: string; icon: typeof Workflow; description: string }[] = [
-  { id: "graph",  label: "Graph",  icon: Workflow,     description: "Drag nodes onto the canvas and bind their ports" },
-  { id: "schema", label: "Schema", icon: Braces,       description: "Define the input, output, and context shapes" },
-  { id: "tests",  label: "Tests",  icon: FlaskConical, description: "Canonical scenarios to run this rule against" },
+  { id: "graph",   label: "Graph",   icon: Workflow,     description: "Drag nodes onto the canvas and bind their ports" },
+  { id: "summary", label: "Summary", icon: BookOpen,     description: "Plain-English narrative + policy citations (AI-authored)" },
+  { id: "schema",  label: "Schema",  icon: Braces,       description: "Define the input, output, and context shapes" },
+  { id: "tests",   label: "Tests",   icon: FlaskConical, description: "Canonical scenarios to run this rule against" },
 ];
 
 export function RuleEditorClient({ initial }: { initial: Rule }) {
@@ -68,6 +75,16 @@ export function RuleEditorClient({ initial }: { initial: Rule }) {
     loadReferences();
     loadTemplates();
   }, [initial, load, loadNodes, loadReferences, loadTemplates]);
+
+  // Open the test panel immediately when arrived via the rules-list "Test"
+  // action (/rules/[id]?test=1). Read the query client-side to avoid Next's
+  // useSearchParams Suspense requirement.
+  useEffect(() => {
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("test") === "1") {
+      setTab("graph");
+      setTestOpen(true);
+    }
+  }, []);
 
   useEffect(() => {
     function onBeforeUnload(e: BeforeUnloadEvent) {
@@ -153,10 +170,12 @@ export function RuleEditorClient({ initial }: { initial: Rule }) {
                 onClose={() => requestEdit(null)}
                 instanceId={editingInstanceId ?? ""}
               />
-              <AiDraftSheet open={aiOpen} onClose={() => setAiOpen(false)} />
+              <AiDraftBar open={aiOpen} onClose={() => setAiOpen(false)} />
             </div>
             <RightPalette />
           </>
+        ) : tab === "summary" ? (
+          <RuleSummaryTab onJumpToNode={(iid) => { setTab("graph"); select({ kind: "node", id: iid }); }} />
         ) : tab === "schema" ? (
           <RuleSchemaTab />
         ) : (

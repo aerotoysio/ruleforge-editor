@@ -13,7 +13,6 @@ import {
   Settings,
   Hammer,
   LayoutDashboard,
-  Play,
   History,
   Plug,
   Users,
@@ -41,7 +40,6 @@ const ITEMS: Item[] = [
   // Workspace — primary build flow
   { href: "/dashboard",  label: "Overview",      icon: LayoutDashboard, group: "workspace", disabled: true },
   { href: "/rules",      label: "Rules",         icon: FileCog,         group: "workspace" },
-  { href: "/test",       label: "Test runner",   icon: Play,            group: "workspace" },
   { href: "/audit",      label: "Audit log",     icon: History,         group: "workspace", disabled: true },
 
   // Data — what rules consume
