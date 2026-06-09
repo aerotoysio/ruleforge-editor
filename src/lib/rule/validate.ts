@@ -37,6 +37,34 @@ function isMeaningfulBinding(b: PortBinding | undefined): boolean {
   }
 }
 
+/**
+ * A multi-condition filter keeps its conditions in `extras.conditions`. A
+ * condition whose operator needs a value but has none (e.g. `starts_with` with
+ * no text) silently matches EVERYTHING — a nasty footgun. This returns false
+ * for such conditions so validation can flag them.
+ */
+const NO_VALUE_OPS = new Set(["is_null", "is_empty", "is_weekend"]);
+function conditionHasValue(c: Record<string, unknown>): boolean {
+  const op = typeof c.operator === "string" ? c.operator : "";
+  if (NO_VALUE_OPS.has(op)) return true;
+  if (op === "between" || op === "not_between") {
+    return c.min != null || c.max != null
+      || (typeof c.from === "string" && c.from !== "") || (typeof c.to === "string" && c.to !== "");
+  }
+  if (op === "within_last" || op === "within_next") return typeof c.amount === "number";
+  if (op === "in" || op === "not_in") {
+    if (c.mode === "ref") return typeof c.refId === "string" && c.refId.length > 0;
+    return Array.isArray(c.values) && c.values.length > 0;
+  }
+  if (op === "day_of_week" || op === "month_of_year" || op === "day_of_month") {
+    return Array.isArray(c.values) && c.values.length > 0;
+  }
+  // single-value operators (equals, starts_with, gt, before, …)
+  if (typeof c.value === "number") return true;
+  if (typeof c.value === "string") return c.value.trim().length > 0;
+  return c.value != null;
+}
+
 export type ValidationIssue = {
   kind:
     | "missing-input"
@@ -96,6 +124,24 @@ export function validateRule(rule: Rule, nodeDefs: NodeDef[]): ValidationIssue[]
           target: { kind: "instance", instanceId: inst.instanceId },
         });
       }
+    }
+
+    // Multi-condition filters keep their conditions in `extras.conditions`.
+    // Flag any condition missing its value — otherwise an empty operator
+    // (e.g. starts_with "") passes every row and the filter does nothing.
+    if (def.category === "filter") {
+      const extras = (rule.bindings[inst.instanceId]?.extras as Record<string, unknown>) ?? {};
+      const conds = Array.isArray(extras.conditions) ? (extras.conditions as Record<string, unknown>[]) : [];
+      conds.forEach((c, idx) => {
+        if (!conditionHasValue(c)) {
+          issues.push({
+            kind: "unbound-required-port",
+            severity: "error",
+            message: `"${inst.label ?? def.name}" — condition ${idx + 1} (${typeof c.operator === "string" ? c.operator : "?"}) has no value, so it would match everything.`,
+            target: { kind: "instance", instanceId: inst.instanceId },
+          });
+        }
+      });
     }
   }
 

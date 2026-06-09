@@ -20,6 +20,7 @@ import { NumberConditionsEditor, type NumCond } from "./NumberConditionsEditor";
 import { DateConditionsEditor, type DateCond } from "./DateConditionsEditor";
 import { TextConditionsEditor, type StrCond } from "./TextConditionsEditor";
 import { loopVarsInScope } from "@/lib/rule/loop-vars";
+import { RequestFieldSelect } from "./RequestFieldSelect";
 import { walkSchema, type SchemaPathNode } from "@/lib/schema/path-walker";
 import { cn } from "@/lib/utils";
 import type { Asset, JsonSchema, NodeDef, NodePort, OutputTemplate, PortBinding, ReferenceSet, Rule } from "@/lib/types";
@@ -231,6 +232,26 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
           ) : null}
 
           {primary.map((port) => {
+            // For-each: pick the array to iterate with the forgiving field picker
+            // (the old array-only SchemaFieldPicker left you stuck when the schema
+            // didn't declare the array). Type a path, or $ if the request itself
+            // is the array.
+            if (def.category === "iterator" && port.name === "source") {
+              const v = draft.source?.kind === "path" ? draft.source.path
+                : draft.source?.kind === "context" ? `$ctx.${draft.source.key}` : "";
+              return (
+                <section className="field-group" key={port.name}>
+                  <span className="field-label">List to loop over<span className="req-pill">req</span></span>
+                  <p className="field-hint">The array to iterate (e.g. <code>$.ssrs</code>, <code>$.offer.pax</code>). Not in the list? Choose “other…” and type the path — or <code>$</code> if the whole request is the array.</p>
+                  <RequestFieldSelect
+                    value={v}
+                    onChange={(p) => setBinding("source", p ? { kind: "path", path: p } : null)}
+                    schema={rule.inputSchema}
+                    placeholder="$.ssrs"
+                  />
+                </section>
+              );
+            }
             // For-each: the loop-variable name is a free text field (defaulting
             // to "item") with the common names as suggestions — not a forced pick.
             if (def.category === "iterator" && port.name === "as") {
