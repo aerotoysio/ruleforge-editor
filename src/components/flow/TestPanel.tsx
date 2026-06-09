@@ -39,6 +39,10 @@ export function TestPanel({ open, onClose, prefill }: Props) {
     fellBackFromHttp?: boolean;
   } | null>(null);
 
+  // Drag-resizable dock height (px), persisted across sessions.
+  const [height, setHeight] = useState(420);
+  const [gripHover, setGripHover] = useState(false);
+
   // The dropdown reads the rule's per-rule tests directly — no API call.
   // This is the same store the Tests tab edits, so changes propagate live.
   const tests = rule?.tests ?? [];
@@ -158,18 +162,83 @@ export function TestPanel({ open, onClose, prefill }: Props) {
     setTrace(null);
   }
 
+  // ── Drag-to-resize the dock ────────────────────────────────────────────
+  // Restore any saved height on mount; otherwise default to ~45% of viewport.
+  useEffect(() => {
+    const saved = Number(localStorage.getItem("rf-testpanel-h"));
+    if (saved && saved > 120) setHeight(saved);
+    else setHeight(Math.round(window.innerHeight * 0.45));
+  }, []);
+  useEffect(() => {
+    if (height > 0) localStorage.setItem("rf-testpanel-h", String(height));
+  }, [height]);
+
+  function startResize(e: React.MouseEvent) {
+    e.preventDefault();
+    const startY = e.clientY;
+    const startH = height;
+    const onMove = (ev: MouseEvent) => {
+      const maxH = window.innerHeight - 96; // leave the topbar reachable
+      setHeight(Math.min(maxH, Math.max(140, startH - (ev.clientY - startY))));
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    document.body.style.cursor = "ns-resize";
+    document.body.style.userSelect = "none";
+  }
+
+  function resetHeight() {
+    setHeight(Math.round(window.innerHeight * 0.45));
+  }
+
   if (!open) return null;
 
   return (
     <div
       className="absolute left-0 right-0 bottom-0 flex flex-col"
       style={{
-        height: "45%",
+        height,
         background: "var(--color-bg)",
         borderTop: "1px solid var(--color-border-strong)",
         boxShadow: "0 -4px 16px rgba(0,0,0,0.04)",
       }}
     >
+      {/* Drag-to-resize handle — straddles the top border. Double-click resets. */}
+      <div
+        onMouseDown={startResize}
+        onDoubleClick={resetHeight}
+        onMouseEnter={() => setGripHover(true)}
+        onMouseLeave={() => setGripHover(false)}
+        title="Drag to resize · double-click to reset"
+        style={{
+          position: "absolute",
+          top: -5,
+          left: 0,
+          right: 0,
+          height: 11,
+          cursor: "ns-resize",
+          zIndex: 20,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <div
+          style={{
+            width: gripHover ? 64 : 46,
+            height: 4,
+            borderRadius: 999,
+            background: gripHover ? "var(--color-fg-muted)" : "var(--color-border-strong)",
+            transition: "background 120ms ease, width 120ms ease",
+          }}
+        />
+      </div>
       <header
         className="px-4 h-10 shrink-0 flex items-center gap-3 border-b"
         style={{ background: "var(--color-bg-soft)" }}

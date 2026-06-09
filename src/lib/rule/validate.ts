@@ -32,6 +32,8 @@ function isMeaningfulBinding(b: PortBinding | undefined): boolean {
     case "date":           return true; // any mode is meaningful
     case "count-of":       return b.arrayPath.trim().length > 0;
     case "template-fill":  return b.templateId.trim().length > 0;
+    case "asset":          return b.assetId.trim().length > 0;
+    case "template-ref":   return b.templateId.trim().length > 0;
   }
 }
 

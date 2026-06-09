@@ -6,6 +6,7 @@ import { Settings2, Trash2 } from "lucide-react";
 import type { RuleNodeInstance, NodeDef, NodeBindings, PortBinding } from "@/lib/types";
 import { useRuleStore } from "@/lib/store/rule-store";
 import { useTemplatesStore } from "@/lib/store/templates-store";
+import { useAssetsStore } from "@/lib/store/assets-store";
 import { cn } from "@/lib/utils";
 
 type NodeViewData = {
@@ -46,7 +47,8 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
   // `isTerminal` early return below, or React sees a different hook count
   // for terminal vs non-terminal nodes and tears down the subtree.
   const templates = useTemplatesStore((s) => s.templates);
-  const summary = describeBindings(bindings, def, templates);
+  const assets = useAssetsStore((s) => s.assets);
+  const summary = describeBindings(bindings, def, templates, assets);
 
   // When the node-def loads asynchronously and we suddenly grow extra handles
   // (per-branch pass/fail), React Flow needs to be told to re-scan the DOM —
@@ -131,13 +133,7 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
           <Handle
             type="target"
             position={Position.Left}
-            style={{
-              background: "var(--panel)",
-              width: 14,
-              height: 14,
-              border: `2px solid ${selected ? "var(--accent)" : "var(--border-strong)"}`,
-              left: -6,
-            }}
+            style={handleStyle(selected ? "var(--accent)" : "var(--border-strong)", "left")}
           />
         ) : null}
         <span
@@ -172,13 +168,7 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
           <Handle
             type="source"
             position={Position.Right}
-            style={{
-              background: "var(--panel)",
-              width: 14,
-              height: 14,
-              border: `2px solid ${selected ? "var(--accent)" : "var(--border-strong)"}`,
-              right: -6,
-            }}
+            style={handleStyle(selected ? "var(--accent)" : "var(--border-strong)", "right")}
           />
         ) : null}
       </div>
@@ -210,7 +200,7 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
 
   return (
     <div
-      className={cn("group/node relative overflow-hidden", outcomeStyle)}
+      className={cn("group/node relative", outcomeStyle)}
       style={{
         width: 220,
         background: "var(--panel)",
@@ -230,13 +220,7 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
         <Handle
           type="target"
           position={Position.Left}
-          style={{
-            background: "var(--panel)",
-            width: 14,
-            height: 14,
-            border: `2px solid ${selected ? "var(--accent)" : "var(--border-strong)"}`,
-            left: -6,
-          }}
+          style={handleStyle(selected ? "var(--accent)" : "var(--border-strong)", "left")}
         />
       ) : null}
 
@@ -429,14 +413,7 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
                         id={out.name}
                         type="source"
                         position={Position.Right}
-                        style={{
-                          top,
-                          background: "var(--panel)",
-                          width: 14,
-                          height: 14,
-                          border: `2px solid ${colour}`,
-                          right: -6,
-                        }}
+                        style={handleStyle(colour, "right", top)}
                       />
                       <span
                         className="absolute right-3 text-[8.5px] font-semibold font-mono tracking-wider uppercase pointer-events-none"
@@ -455,13 +432,7 @@ export function NodeView({ data, selected, id }: NodeProps & { data: NodeViewDat
             <Handle
               type="source"
               position={Position.Right}
-              style={{
-                background: "var(--panel)",
-                width: 14,
-                height: 14,
-                border: `2px solid ${selected ? "var(--accent)" : "var(--border-strong)"}`,
-                right: -6,
-              }}
+              style={handleStyle(selected ? "var(--accent)" : "var(--border-strong)", "right")}
             />
           );
         })()
@@ -474,21 +445,35 @@ function describeBindings(
   bindings: NodeBindings | undefined,
   def: NodeDef | undefined,
   templates: { id: string; name: string }[] = [],
+  assets: { id: string; name?: string }[] = [],
 ): string | null {
   if (!bindings || !def) return null;
   const parts: string[] = [];
   for (const port of [...(def.ports.inputs ?? []), ...(def.ports.params ?? [])]) {
     const b = bindings.bindings[port.name];
     if (!b) continue;
-    parts.push(`${port.name}: ${formatPortBinding(b, templates)}`);
+    parts.push(`${port.name}: ${formatPortBinding(b, templates, assets)}`);
     if (parts.length >= 2) break;
+  }
+  // Multi-condition filters keep their stack of conditions in extras — surface
+  // the count so the card reads at a glance (e.g. "source: $.x · 3 conditions · all").
+  const extras = (bindings as { extras?: Record<string, unknown> }).extras;
+  if (extras && Array.isArray(extras.conditions) && extras.conditions.length > 0) {
+    const n = extras.conditions.length;
+    parts.push(`${n} condition${n === 1 ? "" : "s"} · ${extras.match === "any" ? "any" : "all"}`);
   }
   return parts.length ? parts.join(" · ") : null;
 }
 
-function formatPortBinding(b: PortBinding, templates: { id: string; name: string }[] = []): string {
+function formatPortBinding(
+  b: PortBinding,
+  templates: { id: string; name: string }[] = [],
+  assets: { id: string; name?: string }[] = [],
+): string {
   switch (b.kind) {
     case "path":           return b.path;
+    case "asset":          return assets.find((a) => a.id === b.assetId)?.name ?? b.assetId;
+    case "template-ref":   return templates.find((t) => t.id === b.templateId)?.name ?? b.templateId;
     case "literal":        return typeof b.value === "string" ? `"${b.value}"` : JSON.stringify(b.value);
     case "reference":      return `→ ${b.referenceId}`;
     case "context":        return `$${b.key}`;
@@ -511,6 +496,22 @@ function formatPortBinding(b: PortBinding, templates: { id: string; name: string
  * Accepts hex (#abc / #aabbcc) and falls back to a generic translucent grey
  * for non-hex inputs (CSS vars, oklch() strings) so we don't break rendering.
  */
+// Connection handles — a filled coloured dot with a white ring + hairline so
+// they read as grabbable points on any background (was a near-invisible
+// panel-coloured ring that vanished against white nodes).
+function handleStyle(colour: string, side: "left" | "right", top?: number | string): React.CSSProperties {
+  return {
+    background: colour,
+    width: 15,
+    height: 15,
+    borderRadius: 999,
+    border: "2.5px solid var(--panel)",
+    boxShadow: "0 0 0 1px rgba(0,0,0,0.18)",
+    ...(side === "left" ? { left: -8 } : { right: -8 }),
+    ...(top !== undefined ? { top } : {}),
+  };
+}
+
 function hexToRgba(color: string, alpha: number): string {
   if (!color?.startsWith("#")) return `rgba(120, 120, 120, ${alpha})`;
   let hex = color.slice(1);

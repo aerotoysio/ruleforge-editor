@@ -122,6 +122,8 @@ export type NodeDef = {
   ui?: NodeUI;
   /** Tags for filtering/grouping in the palette. */
   tags?: string[];
+  /** Hide from the Add-nodes palette (kept on disk for back-compat / existing rules). */
+  hidden?: boolean;
   updatedAt: string;
 };
 
@@ -238,6 +240,27 @@ export type PortBinding =
       templateId: string;
       /** Per-field bindings, keyed by template-field name. Missing keys fall back to the template's `default` if present, else null. */
       fields: Record<string, PortBinding>;
+    }
+  /**
+   * Reference a saved Asset (a template + pre-filled values). Emitted by the
+   * asset-only Product node and the text-parse node. Compile inlines the
+   * asset's current `values` (assets are in CompileContext) — the engine never
+   * sees an "asset" kind, just a resolved object.
+   */
+  | {
+      kind: "asset";
+      /** References Asset.id from the workspace's assets/ folder. */
+      assetId: string;
+    }
+  /**
+   * Reference an OutputTemplate by id (a shape, not a filled instance). Used by
+   * the text-parse node to fill a template's fields from parsed tokens; compile
+   * builds a skeleton object from the template's field defaults.
+   */
+  | {
+      kind: "template-ref";
+      /** References OutputTemplate.id from the workspace's templates/ folder. */
+      templateId: string;
     };
 
 /**

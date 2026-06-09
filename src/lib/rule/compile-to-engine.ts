@@ -192,7 +192,7 @@ function compileInstance(
       // No config — engine treats these as terminals.
       break;
     case "filter":
-      data.config = compileFilterConfig(inst, def, portBindings, ctx);
+      data.config = compileFilterConfig(inst, def, portBindings, extras, ctx);
       break;
     case "mutator":
       data.config = compileMutatorConfig(inst, def, portBindings, extras, ctx);
@@ -215,6 +215,35 @@ function compileInstance(
         target: stringOrUndefined(portBindings.target),
       };
       break;
+    case "textParse": {
+      // Split a string field into named tokens via a friendly {token} pattern,
+      // then overlay them onto a saved asset's values. The chosen asset is
+      // inlined at compile time, so the engine only ever sees a base object +
+      // a token→field map — never the "asset" concept.
+      const assetBinding = portBindings.asset;
+      let base: Record<string, unknown> | undefined;
+      if (assetBinding?.kind === "asset") {
+        const asset = ctx.assets.find((a) => a.id === assetBinding.assetId);
+        if (!asset) {
+          throw new CompileError(inst.instanceId, "asset", `textParse references unknown asset "${assetBinding.assetId}"`);
+        }
+        base = asset.values;
+      } else if (assetBinding?.kind === "template-ref") {
+        const tmpl = ctx.templates.find((t) => t.id === assetBinding.templateId);
+        if (!tmpl) {
+          throw new CompileError(inst.instanceId, "asset", `textParse references unknown template "${assetBinding.templateId}"`);
+        }
+        // Skeleton from the template's field defaults; the parsed tokens fill the rest.
+        base = Object.fromEntries(tmpl.fields.filter((f) => f.default !== undefined).map((f) => [f.name, f.default]));
+      }
+      data.config = {
+        source: requireStringPath(inst, "source", portBindings.source, true),
+        pattern: requireLiteralString(inst, "pattern", portBindings.pattern) ?? "",
+        map: literalAsObject(portBindings.mapping, {} as Record<string, string>),
+        base,
+      };
+      break;
+    }
     case "constant":
     case "product": {
       // Engine subtlety: `constant` returns its `value` raw — no placeholder
@@ -328,6 +357,7 @@ function compileFilterConfig(
   inst: RuleNodeInstance,
   def: NodeDef,
   bindings: Record<string, PortBinding>,
+  extras: Record<string, unknown>,
   ctx: CompileContext,
 ): unknown {
   // Engine's filter dispatch picks string / number / date based on config
@@ -343,6 +373,26 @@ function compileFilterConfig(
   const onMissing = (requireLiteralString(inst, "onMissing", bindings.onMissing) ?? "fail");
 
   if (isDate) {
+    // Multi-condition: a stack of date/time conditions on the same source
+    // (extras.conditions), each with its own operator / granularity / timezone.
+    const dateConditions = Array.isArray(extras.conditions) ? (extras.conditions as Record<string, unknown>[]) : [];
+    if (dateConditions.length > 0) {
+      // A single shared timezone (extras.timezone) applies to every condition
+      // that doesn't carry its own.
+      const tz = typeof extras.timezone === "string" && extras.timezone ? extras.timezone : undefined;
+      return {
+        source,
+        compare: { operator: "equals" }, // engine requires a Compare; ignored when conditions present
+        conditions: dateConditions.map((c) => {
+          const cc = compileDateCondition(c);
+          if (tz && !cc.timezone) cc.timezone = tz;
+          return cc;
+        }),
+        match: extras.match === "any" ? "any" : "all",
+        arraySelector,
+        onMissing,
+      };
+    }
     return {
       source,
       compare: {
@@ -359,6 +409,19 @@ function compileFilterConfig(
   }
 
   if (isNumber) {
+    // Multi-condition: a stack of comparisons on the same source (extras.conditions),
+    // combined by match (all = AND, any = OR). One node, many restrictions.
+    const numConditions = Array.isArray(extras.conditions) ? (extras.conditions as Record<string, unknown>[]) : [];
+    if (numConditions.length > 0) {
+      return {
+        source,
+        compare: { operator: "equals" }, // engine requires a Compare; ignored when conditions present
+        conditions: numConditions.map((c) => compileNumberCondition(inst, c, ctx)),
+        match: extras.match === "any" ? "any" : "all",
+        arraySelector,
+        onMissing,
+      };
+    }
     // Single-value vs range — pick by which port is bound.
     const hasMin = bindings.min != null;
     const hasMax = bindings.max != null;
@@ -383,8 +446,25 @@ function compileFilterConfig(
     };
   }
 
-  // String filter — collapse our `literal` port (the values list / single
-  // value / regex pattern) into the engine's `value` / `values` slots.
+  // String filter — multi-condition (extras.conditions) is the unified path that
+  // replaces the veneer filters: each condition is text / list / reference-column,
+  // combined by match. "in" of a reference column = pass when the request value is
+  // a valid item; "not_in" = pass when it's not.
+  const strConditions = Array.isArray(extras.conditions) ? (extras.conditions as Record<string, unknown>[]) : [];
+  if (strConditions.length > 0) {
+    const caseInsensitive = extras.caseSensitive ? false : true;
+    return {
+      source,
+      compare: { operator: "equals" }, // engine requires a Compare; ignored when conditions present
+      conditions: strConditions.map((c) => compileStringCondition(inst, c, ctx, caseInsensitive)),
+      match: extras.match === "any" ? "any" : "all",
+      arraySelector,
+      onMissing,
+    };
+  }
+
+  // Legacy single string filter — collapse our `literal` port (the values list /
+  // single value / regex pattern) into the engine's `value` / `values` slots.
   const compare: Record<string, unknown> = { operator };
   const literalBinding = bindings.literal;
   const compiledList = compileListValues(inst, "literal", literalBinding, ctx);
@@ -405,6 +485,80 @@ function compileFilterConfig(
     arraySelector,
     onMissing,
   };
+}
+
+// Compile one editor number condition → engine NumberFilterCompare shape.
+function compileNumberCondition(
+  inst: RuleNodeInstance,
+  c: Record<string, unknown>,
+  ctx: CompileContext,
+): Record<string, unknown> {
+  const operator = typeof c.operator === "string" ? c.operator : "equals";
+  const cmp: Record<string, unknown> = { operator };
+  if (operator === "between" || operator === "not_between") {
+    if (typeof c.min === "number") cmp.min = c.min;
+    if (typeof c.max === "number") cmp.max = c.max;
+    if (typeof c.minInclusive === "boolean") cmp.minInclusive = c.minInclusive;
+    if (typeof c.maxInclusive === "boolean") cmp.maxInclusive = c.maxInclusive;
+  } else if (operator === "in" || operator === "not_in") {
+    let values: number[] = [];
+    if (c.valuesRef && typeof c.valuesRef === "object") {
+      const resolved = compileListValues(inst, "condition", c.valuesRef as PortBinding, ctx) ?? [];
+      values = resolved.map((v) => Number(v)).filter((n) => !Number.isNaN(n));
+    } else if (Array.isArray(c.values)) {
+      values = (c.values as unknown[]).map((v) => Number(v)).filter((n) => !Number.isNaN(n));
+    }
+    cmp.values = values;
+  } else if (operator !== "is_null") {
+    if (typeof c.value === "number") cmp.value = c.value;
+  }
+  if (typeof c.round === "string" && c.round) cmp.round = c.round;
+  return cmp;
+}
+
+// Compile one editor date condition → engine DateFilterCompare shape. The editor
+// stores date conditions close to the engine shape, so this mostly passes fields
+// through (operator + granularity + value/from/to/amount/unit/timezone/values).
+function compileDateCondition(c: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { operator: typeof c.operator === "string" ? c.operator : "equals" };
+  if (typeof c.granularity === "string") out.granularity = c.granularity;
+  if (typeof c.value === "string") out.value = c.value;
+  if (typeof c.from === "string") out.from = c.from;
+  if (typeof c.to === "string") out.to = c.to;
+  if (typeof c.amount === "number") out.amount = c.amount;
+  if (typeof c.unit === "string") out.unit = c.unit;
+  if (typeof c.timezone === "string") out.timezone = c.timezone;
+  if (typeof c.fromInclusive === "boolean") out.fromInclusive = c.fromInclusive;
+  if (typeof c.toInclusive === "boolean") out.toInclusive = c.toInclusive;
+  if (Array.isArray(c.values)) out.values = (c.values as unknown[]).map(Number).filter((n) => !Number.isNaN(n));
+  return out;
+}
+
+// Compile one editor text condition → engine StringFilterCompare shape. The
+// in/not_in list comes either from a typed list or a reference-table column.
+function compileStringCondition(
+  inst: RuleNodeInstance,
+  c: Record<string, unknown>,
+  ctx: CompileContext,
+  caseInsensitive: boolean,
+): Record<string, unknown> {
+  const operator = typeof c.operator === "string" ? c.operator : "equals";
+  const cmp: Record<string, unknown> = { operator };
+  if (operator === "in" || operator === "not_in") {
+    if (c.mode === "ref" && typeof c.refId === "string" && c.refId) {
+      const binding = { kind: "ref-select", referenceId: c.refId, valueColumn: typeof c.refColumn === "string" ? c.refColumn : "" } as PortBinding;
+      cmp.values = (compileListValues(inst, "condition", binding, ctx) ?? []).map((v) => String(v));
+    } else if (Array.isArray(c.values)) {
+      cmp.values = (c.values as unknown[]).map((v) => String(v));
+    } else {
+      cmp.values = [];
+    }
+  } else if (operator !== "is_null" && operator !== "is_empty") {
+    if (typeof c.value === "string") cmp.value = c.value;
+  }
+  cmp.caseInsensitive = caseInsensitive;
+  cmp.trim = true;
+  return cmp;
 }
 
 function defaultOperator(def: NodeDef, portType: NodePort["type"]): string {
@@ -544,6 +698,15 @@ function compileShapeConfig(
     // Whole-shape path binding — engine resolves at eval time. Same product
     // override as template-fill above.
     return { output: `\${${value.path}}` };
+  }
+  if (value.kind === "asset") {
+    // Asset-only product: inline the saved asset's current values. The engine
+    // receives a plain object; downstream mutators can still override fields.
+    const asset = ctx.assets.find((a) => a.id === value.assetId);
+    if (!asset) {
+      throw new CompileError(inst.instanceId, "value", `asset binding references unknown asset "${value.assetId}"`);
+    }
+    return def.category === "product" ? { output: asset.values } : { value: asset.values };
   }
   // Other binding kinds aren't supported on shape ports today.
   throw new CompileError(

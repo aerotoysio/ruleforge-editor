@@ -61,6 +61,7 @@ const GROUP_LABEL: Record<NodeCategory, string> = {
   constant: "Data flow",
   product: "Data flow",
   mutator: "Data flow",
+  textParse: "Data flow",
   calc: "Compute",
   reference: "Compute",
   iterator: "Iteration",
@@ -87,8 +88,9 @@ export function RightPalette() {
 
   const q = query.trim().toLowerCase();
   const filteredNodes = useMemo(() => {
-    if (!q) return nodes;
-    return nodes.filter((n) =>
+    const visible = nodes.filter((n) => !n.hidden);
+    if (!q) return visible;
+    return visible.filter((n) =>
       n.name.toLowerCase().includes(q)
       || n.description?.toLowerCase().includes(q)
       || n.tags?.some((t) => t.toLowerCase().includes(q))

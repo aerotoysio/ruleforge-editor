@@ -14,6 +14,12 @@ import { ShuttlePicker, type ShuttleItem } from "./ShuttlePicker";
 import { DateBindingPicker } from "./DateBindingPicker";
 import { MarketsPicker } from "./MarketsPicker";
 import { TemplateFillEditor } from "./TemplateFillEditor";
+import { AssetPicker } from "./AssetPicker";
+import { TextParseEditor } from "./TextParseEditor";
+import { NumberConditionsEditor, type NumCond } from "./NumberConditionsEditor";
+import { DateConditionsEditor, type DateCond } from "./DateConditionsEditor";
+import { TextConditionsEditor, type StrCond } from "./TextConditionsEditor";
+import { loopVarsInScope } from "@/lib/rule/loop-vars";
 import { walkSchema, type SchemaPathNode } from "@/lib/schema/path-walker";
 import { cn } from "@/lib/utils";
 import type { Asset, JsonSchema, NodeDef, NodePort, OutputTemplate, PortBinding, ReferenceSet, Rule } from "@/lib/types";
@@ -78,6 +84,10 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
   }, [open, initialBindings, instance?.label, instance?.description, loadRefs, loadTemplates, loadAssets]);
 
   if (!rule || !instance || !def) return null;
+
+  // Loop variables ($item / $pax …) contributed by enclosing For-each nodes —
+  // offered in this node's field pickers so you can bind to the current element.
+  const loopVars = loopVarsInScope(rule, instanceId, nodeDefs);
 
   // Categorise ports: primary (visible by default) vs advanced (collapsed).
   // arraySelector is a primary business choice — not advanced. caseInsensitive
@@ -185,26 +195,32 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
               (not the bindings), so a third-party reading the canvas can scan
               "filter for AU market" without opening every node. */}
           <section className="field-group">
-            <span className="field-label">Identity</span>
-            <input
-              className="input"
-              value={labelDraft}
-              onChange={(e) => setLabelDraft(e.target.value)}
-              placeholder={def.name}
-              aria-label="Node label"
-            />
-            <textarea
-              className="json-input"
-              style={{ fontFamily: "var(--font-sans)", fontSize: 12, minHeight: 56 }}
-              value={descriptionDraft}
-              onChange={(e) => setDescriptionDraft(e.target.value)}
-              placeholder={`What does this ${def.category} do in this rule? (e.g. "Filter for AU market")`}
-              rows={2}
-              aria-label="Node description"
-            />
-            <p className="field-hint">
-              Label and description are per-instance. The default label is the node-def name; the description shows on the canvas card so the rule reads as prose.
-            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr", gap: 10, alignItems: "start" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <span className="field-label" style={{ margin: 0 }}>Name</span>
+                <input
+                  className="input"
+                  value={labelDraft}
+                  onChange={(e) => setLabelDraft(e.target.value)}
+                  placeholder={def.name}
+                  aria-label="Node label"
+                />
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <span className="field-label" style={{ margin: 0 }}>
+                  Description <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>· shows on the card</span>
+                </span>
+                <textarea
+                  className="json-input"
+                  style={{ fontFamily: "var(--font-sans)", fontSize: 12, minHeight: 38 }}
+                  value={descriptionDraft}
+                  onChange={(e) => setDescriptionDraft(e.target.value)}
+                  placeholder={`e.g. "Filter for AU market"`}
+                  rows={2}
+                  aria-label="Node description"
+                />
+              </div>
+            </div>
           </section>
 
           {primary.length === 0 && advanced.length === 0 ? (
@@ -215,6 +231,104 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
           ) : null}
 
           {primary.map((port) => {
+            // For-each: the loop-variable name is a free text field (defaulting
+            // to "item") with the common names as suggestions — not a forced pick.
+            if (def.category === "iterator" && port.name === "as") {
+              const v = draft.as?.kind === "literal" && typeof draft.as.value === "string" ? draft.as.value : "";
+              return (
+                <section className="field-group" key={port.name}>
+                  <span className="field-label">Loop variable name<span className="req-pill">req</span></span>
+                  <p className="field-hint">What to call each item inside the loop — downstream nodes read it as <code>$name</code> (e.g. <code>$item.id</code>). Defaults to <code>item</code>.</p>
+                  <input
+                    className="input mono"
+                    style={{ fontFamily: "var(--font-mono)", maxWidth: 280 }}
+                    list="iter-as-suggestions"
+                    value={v}
+                    onChange={(e) => setBinding("as", e.target.value ? { kind: "literal", value: e.target.value } : null)}
+                    placeholder="item"
+                  />
+                  <datalist id="iter-as-suggestions">{(port.enum ?? []).map((o) => <option key={o.value} value={o.value} />)}</datalist>
+                </section>
+              );
+            }
+            // Parse-string node: one unified friendly editor (source + {token}
+            // pattern + live preview + asset + token→field mapping) replaces the
+            // per-port fields. Render it once on the source port; skip the rest.
+            if (def.category === "textParse") {
+              if (port.name !== "source") return null;
+              return (
+                <TextParseEditor
+                  key="textparse"
+                  draft={draft}
+                  setBinding={setBinding}
+                  loopVars={loopVars}
+                  inputSchema={rule.inputSchema}
+                />
+              );
+            }
+            // Number filter: one field, a stack of conditions (ALL/ANY) — replaces
+            // a chain of single-compare nodes. Render once on the source port.
+            if (def.category === "filter") {
+              const sp = (def.ports.inputs ?? []).find((p) => p.name === "source");
+              if (sp?.type === "number" || sp?.type === "integer") {
+                if (port.name !== "source") return null;
+                const dOp = draft.operator?.kind === "literal" && typeof draft.operator.value === "string" ? draft.operator.value : null;
+                const legacy: NumCond | null = dOp ? {
+                  operator: dOp,
+                  value: draft.value?.kind === "literal" && typeof draft.value.value === "number" ? draft.value.value : undefined,
+                  values: draft.values?.kind === "literal" && Array.isArray(draft.values.value) ? (draft.values.value as unknown[]).map(Number).filter((n) => !Number.isNaN(n)) : undefined,
+                  min: draft.min?.kind === "literal" && typeof draft.min.value === "number" ? draft.min.value : undefined,
+                  max: draft.max?.kind === "literal" && typeof draft.max.value === "number" ? draft.max.value : undefined,
+                } : null;
+                return (
+                  <NumberConditionsEditor
+                    key="numcond"
+                    source={draft.source}
+                    onSource={(b) => setBinding("source", b)}
+                    conditions={(extrasDraft.conditions as NumCond[]) ?? []}
+                    match={(extrasDraft.match as string) ?? "all"}
+                    onChange={(conditions, match) => setExtrasDraft((prev) => ({ ...prev, conditions, match }))}
+                    legacy={legacy}
+                    loopVars={loopVars}
+                    inputSchema={rule.inputSchema}
+                  />
+                );
+              }
+              if (sp?.type === "date") {
+                if (port.name !== "source") return null;
+                return (
+                  <DateConditionsEditor
+                    key="datecond"
+                    source={draft.source}
+                    onSource={(b) => setBinding("source", b)}
+                    conditions={(extrasDraft.conditions as DateCond[]) ?? []}
+                    match={(extrasDraft.match as string) ?? "all"}
+                    timezone={(extrasDraft.timezone as string) ?? ""}
+                    onChange={(conditions, match, timezone) => setExtrasDraft((prev) => ({ ...prev, conditions, match, timezone }))}
+                    loopVars={loopVars}
+                    inputSchema={rule.inputSchema}
+                  />
+                );
+              }
+              // Generic text filter only (not the specialised veneers, which keep
+              // their own editors). One field, many text/list/reference conditions.
+              if (def.id === "node-filter-string-in") {
+                if (port.name !== "source") return null;
+                return (
+                  <TextConditionsEditor
+                    key="textcond"
+                    source={draft.source}
+                    onSource={(b) => setBinding("source", b)}
+                    conditions={(extrasDraft.conditions as StrCond[]) ?? []}
+                    match={(extrasDraft.match as string) ?? "all"}
+                    caseSensitive={!!extrasDraft.caseSensitive}
+                    onChange={(conditions, match, caseSensitive) => setExtrasDraft((prev) => ({ ...prev, conditions, match, caseSensitive }))}
+                    loopVars={loopVars}
+                    inputSchema={rule.inputSchema}
+                  />
+                );
+              }
+            }
             if (port.name === "matchOn") {
               return (
                 <section className="field-group" key={port.name}>
@@ -578,6 +692,12 @@ function PortEditor({
   onChange: (b: PortBinding | null) => void;
   inputSchema: JsonSchema;
 }) {
+  // Port references a saved Asset (the asset-only Product node) — dropdown only.
+  const allowsAsset = port.bindingKinds?.includes("asset") ?? false;
+  if (allowsAsset) {
+    return <AssetPicker binding={binding} onChange={onChange} />;
+  }
+
   // Port supports template-fill (e.g. constant node's value port).
   const allowsTemplate = port.bindingKinds?.includes("template-fill") ?? false;
   if (allowsTemplate) {

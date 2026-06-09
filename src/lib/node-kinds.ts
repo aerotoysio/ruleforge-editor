@@ -277,6 +277,16 @@ export const NODE_KINDS: Record<NodeCategory, NodeKindMeta> = {
       config: { groupKey: "" },
     }),
   },
+  textParse: {
+    category: "textParse",
+    label: "Parse string",
+    shortLabel: "Parse",
+    badge: "PARSE",
+    color: "#0d9488",
+    description: "Split a string (e.g. an SSR) into fields via a friendly {token} pattern, onto an asset.",
+    defaultLabel: "Parse string",
+    defaultData: () => ({ label: "Parse string", category: "textParse" }),
+  },
 };
 
 export const PALETTE_CATEGORIES: NodeCategory[] = [
@@ -285,6 +295,7 @@ export const PALETTE_CATEGORIES: NodeCategory[] = [
   "product",
   "mutator",
   "calc",
+  "textParse",
   "constant",
   "iterator",
   "merge",

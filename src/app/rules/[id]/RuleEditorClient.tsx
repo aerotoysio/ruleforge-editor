@@ -6,6 +6,7 @@ import type { Rule, RuleTest } from "@/lib/types";
 import { useRuleStore } from "@/lib/store/rule-store";
 import { useReferencesStore } from "@/lib/store/references-store";
 import { useTemplatesStore } from "@/lib/store/templates-store";
+import { useAssetsStore } from "@/lib/store/assets-store";
 import { useNodesStore } from "@/lib/store/nodes-store";
 import { Canvas } from "@/components/flow/Canvas";
 import { Toolbar } from "@/components/flow/Toolbar";
@@ -27,7 +28,7 @@ import { cn } from "@/lib/utils";
 // consistent form (with the Raw tab, matchOn editor, calc builder, structured
 // rows and no-config signposting) rather than a separate per-category panel.
 const UNIFIED_DIALOG_CATEGORIES = new Set([
-  "filter", "mutator", "calc", "iterator", "merge", "constant", "ruleRef",
+  "filter", "mutator", "calc", "textParse", "iterator", "merge", "constant", "ruleRef",
   "product", "logic", "assert", "switch", "bucket", "sort", "limit",
   "distinct", "groupBy", "reference", "api", "input", "output",
 ]);
@@ -53,6 +54,7 @@ export function RuleEditorClient({ initial }: { initial: Rule }) {
   const loadNodes = useNodesStore((s) => s.load);
   const loadReferences = useReferencesStore((s) => s.load);
   const loadTemplates = useTemplatesStore((s) => s.load);
+  const loadAssets = useAssetsStore((s) => s.load);
   const [tab, setTab] = useState<Tab>("graph");
   const [testOpen, setTestOpen] = useState(false);
   const [testPrefill, setTestPrefill] = useState<RuleTest | null>(null);
@@ -74,7 +76,8 @@ export function RuleEditorClient({ initial }: { initial: Rule }) {
     loadNodes();
     loadReferences();
     loadTemplates();
-  }, [initial, load, loadNodes, loadReferences, loadTemplates]);
+    loadAssets();
+  }, [initial, load, loadNodes, loadReferences, loadTemplates, loadAssets]);
 
   // Open the test panel immediately when arrived via the rules-list "Test"
   // action (/rules/[id]?test=1). Read the query client-side to avoid Next's

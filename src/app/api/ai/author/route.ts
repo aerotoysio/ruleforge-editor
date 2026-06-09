@@ -138,6 +138,12 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  if (!result.draft) {
+    return NextResponse.json(
+      { error: "Could not produce a valid rule from that policy. Try rephrasing it.", raw: result.text.slice(0, 2000) },
+      { status: 502 },
+    );
+  }
   const d = result.draft;
   const inputSchema = schemaMode === "provided" ? body.providedSchemas?.inputSchema ?? EMPTY_SCHEMA : d.inputSchema ?? EMPTY_SCHEMA;
   const outputSchema = schemaMode === "provided" ? body.providedSchemas?.outputSchema ?? EMPTY_SCHEMA : d.outputSchema ?? EMPTY_SCHEMA;
