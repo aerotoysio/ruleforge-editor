@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { listRules, writeRule, getActiveRoot } from "@/lib/server/workspace";
+import { syncCompiledRule } from "@/lib/server/compiled-sync";
 import type { Rule } from "@/lib/types";
 
 export async function GET() {
@@ -17,5 +18,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Rule must have id and name" }, { status: 400 });
   }
   const fileName = await writeRule(root, rule);
-  return NextResponse.json({ rule, fileName });
+  const engineSync = await syncCompiledRule(root, rule.id);
+  return NextResponse.json({ rule, fileName, engineSync });
 }

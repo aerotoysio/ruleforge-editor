@@ -5,6 +5,7 @@ import {
   deleteRule,
   getActiveRoot,
 } from "@/lib/server/workspace";
+import { syncCompiledRule, scheduleEngineRefresh } from "@/lib/server/compiled-sync";
 import type { Rule } from "@/lib/types";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -27,7 +28,8 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
     return NextResponse.json({ error: "Rule id mismatch" }, { status: 400 });
   }
   const fileName = await writeRule(root, incoming);
-  return NextResponse.json({ rule: incoming, fileName });
+  const engineSync = await syncCompiledRule(root, incoming.id);
+  return NextResponse.json({ rule: incoming, fileName, engineSync });
 }
 
 export async function DELETE(_req: NextRequest, ctx: Ctx) {
@@ -35,5 +37,6 @@ export async function DELETE(_req: NextRequest, ctx: Ctx) {
   if (!root) return NextResponse.json({ error: "No workspace" }, { status: 409 });
   const { id } = await ctx.params;
   await deleteRule(root, id);
+  scheduleEngineRefresh();
   return NextResponse.json({ ok: true });
 }

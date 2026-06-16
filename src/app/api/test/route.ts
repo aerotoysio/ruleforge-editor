@@ -13,6 +13,7 @@ import {
   listAssetsFull,
 } from "@/lib/server/workspace";
 import { compileRuleForEngine, CompileError } from "@/lib/rule/compile-to-engine";
+import { syncCompiledRule } from "@/lib/server/compiled-sync";
 
 type Body = {
   ruleId: string;
@@ -134,6 +135,10 @@ export async function POST(req: NextRequest) {
     );
   }
   const tStaged = Date.now();
+
+  // Keep the SQLite-backed engine's compiled_rules current for the tested rule
+  // (+ a debounced /admin/refresh). No-op for the CLI/file path. Best-effort.
+  await syncCompiledRule(root, body.ruleId);
 
   if (wantHttp) {
     // ── HTTP path ────────────────────────────────────────────────────────
