@@ -41,6 +41,7 @@ export type NodeCategory =
   | "distinct"
   | "groupBy"
   | "textParse"
+  | "join"
   | "ruleRef";
 
 export type EdgeBranch = "pass" | "fail" | "default";

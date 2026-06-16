@@ -287,6 +287,16 @@ export const NODE_KINDS: Record<NodeCategory, NodeKindMeta> = {
     defaultLabel: "Parse string",
     defaultData: () => ({ label: "Parse string", category: "textParse" }),
   },
+  join: {
+    category: "join",
+    label: "Join / Enrich",
+    shortLabel: "Join",
+    badge: "JOIN",
+    color: "#7c3aed",
+    description: "Enrich a list with matching items from another list, by key.",
+    defaultLabel: "Join",
+    defaultData: () => ({ label: "Join", category: "join" }),
+  },
 };
 
 export const PALETTE_CATEGORIES: NodeCategory[] = [
@@ -306,6 +316,7 @@ export const PALETTE_CATEGORIES: NodeCategory[] = [
   "limit",
   "distinct",
   "groupBy",
+  "join",
   "reference",
   "api",
   "ruleRef",

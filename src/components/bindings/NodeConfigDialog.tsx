@@ -21,6 +21,7 @@ import { DateConditionsEditor, type DateCond } from "./DateConditionsEditor";
 import { TextConditionsEditor, type StrCond } from "./TextConditionsEditor";
 import { loopVarsInScope } from "@/lib/rule/loop-vars";
 import { RequestFieldSelect } from "./RequestFieldSelect";
+import { JoinEditor } from "./JoinEditor";
 import { walkSchema, type SchemaPathNode } from "@/lib/schema/path-walker";
 import { cn } from "@/lib/utils";
 import type { Asset, JsonSchema, NodeDef, NodePort, OutputTemplate, PortBinding, ReferenceSet, Rule } from "@/lib/types";
@@ -349,6 +350,18 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
                   />
                 );
               }
+            }
+            // Join / Enrich node: one friendly sentence-like editor.
+            if (def.category === "join") {
+              if (port.name !== "left") return null;
+              return (
+                <JoinEditor
+                  key="joineditor"
+                  draft={draft}
+                  setBinding={setBinding}
+                  inputSchema={rule.inputSchema}
+                />
+              );
             }
             if (port.name === "matchOn") {
               return (

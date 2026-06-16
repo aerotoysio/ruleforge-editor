@@ -244,6 +244,16 @@ function compileInstance(
       };
       break;
     }
+    case "join":
+      data.config = {
+        left: stringOrUndefined(portBindings.left),
+        right: stringOrUndefined(portBindings.right),
+        leftKey: requireLiteralString(inst, "leftKey", portBindings.leftKey) ?? "",
+        rightKey: requireLiteralString(inst, "rightKey", portBindings.rightKey) ?? "",
+        as: requireLiteralString(inst, "as", portBindings.as) ?? "",
+        mode: requireLiteralString(inst, "mode", portBindings.mode) ?? "collect",
+      };
+      break;
     case "constant":
     case "product": {
       // Engine subtlety: `constant` returns its `value` raw — no placeholder

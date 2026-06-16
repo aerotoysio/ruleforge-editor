@@ -30,7 +30,7 @@ import { cn } from "@/lib/utils";
 const UNIFIED_DIALOG_CATEGORIES = new Set([
   "filter", "mutator", "calc", "textParse", "iterator", "merge", "constant", "ruleRef",
   "product", "logic", "assert", "switch", "bucket", "sort", "limit",
-  "distinct", "groupBy", "reference", "api", "input", "output",
+  "distinct", "groupBy", "join", "reference", "api", "input", "output",
 ]);
 
 type Tab = "graph" | "summary" | "schema" | "tests";

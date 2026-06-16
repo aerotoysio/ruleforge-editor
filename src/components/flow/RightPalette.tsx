@@ -46,6 +46,7 @@ const GROUP_ORDER: NodeCategory[] = [
   "limit",
   "distinct",
   "groupBy",
+  "join",
   "api",
   "ruleRef",
 ];
@@ -70,6 +71,7 @@ const GROUP_LABEL: Record<NodeCategory, string> = {
   limit: "Array transform",
   distinct: "Array transform",
   groupBy: "Array transform",
+  join: "Array transform",
   api: "External",
   ruleRef: "Composition",
 };
