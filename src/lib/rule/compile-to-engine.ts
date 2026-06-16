@@ -252,8 +252,38 @@ function compileInstance(
         rightKey: requireLiteralString(inst, "rightKey", portBindings.rightKey) ?? "",
         as: requireLiteralString(inst, "as", portBindings.as) ?? "",
         mode: requireLiteralString(inst, "mode", portBindings.mode) ?? "collect",
+        onlyMatched: booleanOrUndefined(portBindings.onlyMatched),
       };
       break;
+    case "filterList": {
+      // Keep the array elements matching a stack of conditions on one element
+      // field. Reuses the same condition compilers as the gate filters; the
+      // engine runs the matching typed evaluator per element.
+      const vt = requireLiteralString(inst, "valueType", portBindings.valueType) ?? "string";
+      const conds = Array.isArray(extras.conditions) ? (extras.conditions as Record<string, unknown>[]) : [];
+      let conditions: Record<string, unknown>[];
+      if (vt === "number") {
+        conditions = conds.map((c) => compileNumberCondition(inst, c, ctx));
+      } else if (vt === "date") {
+        const tz = typeof extras.timezone === "string" && extras.timezone ? extras.timezone : undefined;
+        conditions = conds.map((c) => {
+          const cc = compileDateCondition(c);
+          if (tz && !cc.timezone) cc.timezone = tz;
+          return cc;
+        });
+      } else {
+        const caseInsensitive = extras.caseSensitive ? false : true;
+        conditions = conds.map((c) => compileStringCondition(inst, c, ctx, caseInsensitive));
+      }
+      data.config = {
+        source: stringOrUndefined(portBindings.source),
+        field: requireLiteralString(inst, "field", portBindings.field) ?? "",
+        valueType: vt,
+        conditions,
+        match: extras.match === "any" ? "any" : "all",
+      };
+      break;
+    }
     case "constant":
     case "product": {
       // Engine subtlety: `constant` returns its `value` raw — no placeholder

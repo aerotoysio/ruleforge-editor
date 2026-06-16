@@ -297,6 +297,16 @@ export const NODE_KINDS: Record<NodeCategory, NodeKindMeta> = {
     defaultLabel: "Join",
     defaultData: () => ({ label: "Join", category: "join" }),
   },
+  filterList: {
+    category: "filterList",
+    label: "Filter list",
+    shortLabel: "Filter list",
+    badge: "WHERE",
+    color: "#0891b2",
+    description: "Keep only the array elements matching your conditions.",
+    defaultLabel: "Filter list",
+    defaultData: () => ({ label: "Filter list", category: "filterList" }),
+  },
 };
 
 export const PALETTE_CATEGORIES: NodeCategory[] = [
@@ -317,6 +327,7 @@ export const PALETTE_CATEGORIES: NodeCategory[] = [
   "distinct",
   "groupBy",
   "join",
+  "filterList",
   "reference",
   "api",
   "ruleRef",
