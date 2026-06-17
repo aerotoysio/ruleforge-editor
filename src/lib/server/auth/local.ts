@@ -43,6 +43,20 @@ function ensureSeed(rootPath: string): void {
       .run(uid, "demo@aerotoys.io", "Demo Admin", hashPassword("demo"), new Date().toISOString());
     db.prepare("INSERT OR REPLACE INTO user_roles (user_id, role_id) VALUES (?, ?)").run(uid, "admin");
   }
+  // Idempotent demo team members so rule-scoping ("Tax Team → Tax rules") is
+  // testable even on a db seeded before team users existed. Password: "demo".
+  const team = [
+    { id: "u-tax", email: "tax@aerotoys.io", name: "Tax Team", role: "tax-team" },
+    { id: "u-offer", email: "offer@aerotoys.io", name: "Offer Team", role: "offer-team" },
+  ];
+  for (const t of team) {
+    const exists = db.prepare("SELECT 1 AS x FROM users WHERE id = ?").get(t.id);
+    if (!exists) {
+      db.prepare("INSERT INTO users (id, email, name, password_hash, created_at) VALUES (?, ?, ?, ?, ?)")
+        .run(t.id, t.email, t.name, hashPassword("demo"), new Date().toISOString());
+      db.prepare("INSERT OR REPLACE INTO user_roles (user_id, role_id) VALUES (?, ?)").run(t.id, t.role);
+    }
+  }
   seeded.add(rootPath);
 }
 

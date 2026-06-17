@@ -104,6 +104,7 @@ export type RuleSummary = {
   currentVersion: number;
   tags?: string[];
   category?: string;
+  ownerRole?: string;
   updatedAt: string;
   updatedBy?: string;
 };
@@ -173,6 +174,8 @@ export type Rule = {
   tags?: string[];
   category?: string;
   projectId?: string;
+  /** Role id (team) that owns this rule. Non-admins only see/edit rules their roles own (or unassigned). */
+  ownerRole?: string;
   /**
    * The input-shape this rule consumes. By default the rule embeds its own
    * literal schema. When `inputSchemaRef` is set, the editor resolves the

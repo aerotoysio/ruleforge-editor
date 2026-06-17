@@ -141,7 +141,7 @@ const stamp = () => new Date().toISOString();
 
 function toRuleSummary(rule: {
   id: string; name: string; description?: string; endpoint: string; method: HttpMethodKind;
-  status: RuleStatus; currentVersion: number; tags?: string[]; category?: string; updatedAt: string; updatedBy?: string;
+  status: RuleStatus; currentVersion: number; tags?: string[]; category?: string; ownerRole?: string; updatedAt: string; updatedBy?: string;
 }): RuleSummary {
   return {
     id: rule.id,
@@ -153,6 +153,7 @@ function toRuleSummary(rule: {
     currentVersion: rule.currentVersion,
     tags: rule.tags,
     category: rule.category,
+    ownerRole: rule.ownerRole,
     updatedAt: rule.updatedAt,
     updatedBy: rule.updatedBy,
   };

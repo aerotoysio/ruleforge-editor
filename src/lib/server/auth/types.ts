@@ -39,3 +39,14 @@ export const PERM = {
 export function userHasPermission(user: AuthUser, perm: string): boolean {
   return user.permissions.includes("*") || user.permissions.includes(perm);
 }
+
+/**
+ * Rule-scoping: admins ("*") see/act on everything; a rule with no ownerRole is
+ * visible to all signed-in users; otherwise the user must belong to the owning
+ * role. This is the "Tax Team → Tax rules" boundary.
+ */
+export function canAccessRule(user: AuthUser, ownerRole: string | null | undefined): boolean {
+  if (user.permissions.includes("*")) return true;
+  if (!ownerRole) return true;
+  return user.roles.includes(ownerRole);
+}

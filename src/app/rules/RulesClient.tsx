@@ -15,6 +15,7 @@ import {
   Play,
   Copy,
   Trash2,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -32,11 +33,22 @@ export type EnrichedRule = {
   validity: { errors: number; warnings: number };
   testCount: number;
   tags?: string[];
+  ownerRole?: string | null;
 };
 
-const COLS = 9; // checkbox + rule + endpoint + status + health + v + tests + updated + menu
+const COLS = 10; // checkbox + rule + endpoint + status + team + health + v + tests + updated + menu
 
-export function RulesClient({ rules }: { rules: EnrichedRule[] }) {
+const TEAM_LABELS: Record<string, string> = {
+  "tax-team": "Tax Team",
+  "offer-team": "Offer Team",
+  admin: "Admin",
+};
+const ASSIGNABLE = [
+  { id: "tax-team", label: "Tax Team" },
+  { id: "offer-team", label: "Offer Team" },
+];
+
+export function RulesClient({ rules, isAdmin = false }: { rules: EnrichedRule[]; isAdmin?: boolean }) {
   const router = useRouter();
   const [activeStatus, setActiveStatus] = useState<string>("All");
   const [query, setQuery] = useState("");
@@ -159,6 +171,27 @@ export function RulesClient({ rules }: { rules: EnrichedRule[] }) {
     }
   }
 
+  async function assignTeam(id: string, ownerRole: string | null) {
+    setBusy(true);
+    setMenuFor(null);
+    try {
+      const res = await fetch(`/api/rules/${encodeURIComponent(id)}/owner`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ownerRole }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        toast.error(d.error ?? "Couldn't reassign");
+        return;
+      }
+      toast.success(ownerRole ? `Assigned to ${TEAM_LABELS[ownerRole] ?? ownerRole}` : "Unassigned (all teams)");
+      router.refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="page">
       <div className="page-head">
@@ -253,6 +286,7 @@ export function RulesClient({ rules }: { rules: EnrichedRule[] }) {
                   <th>Rule</th>
                   <th>Endpoint</th>
                   <th>Status</th>
+                  <th>Team</th>
                   <th>Health</th>
                   <th className="num">v</th>
                   <th className="num">Tests</th>
@@ -338,6 +372,28 @@ export function RulesClient({ rules }: { rules: EnrichedRule[] }) {
                               <StatusBadge status={r.status} />
                             </td>
                             <td>
+                              {r.ownerRole ? (
+                                <span
+                                  title={`Owned by ${TEAM_LABELS[r.ownerRole] ?? r.ownerRole}`}
+                                  style={{
+                                    fontSize: 10.5,
+                                    fontWeight: 600,
+                                    padding: "2px 7px",
+                                    borderRadius: 999,
+                                    background: "var(--accent-soft, var(--panel-2))",
+                                    color: "var(--accent, var(--text))",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {TEAM_LABELS[r.ownerRole] ?? r.ownerRole}
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: 11, color: "var(--text-faint)" }} title="Visible to all teams">
+                                  All teams
+                                </span>
+                              )}
+                            </td>
+                            <td>
                               <ValidityPill validity={r.validity} />
                             </td>
                             <td className="num mono">
@@ -386,6 +442,27 @@ export function RulesClient({ rules }: { rules: EnrichedRule[] }) {
                                     <MenuItem icon={Pencil} label="Edit" onClick={() => router.push(`/rules/${encodeURIComponent(r.id)}`)} />
                                     <MenuItem icon={Play} label="Test" onClick={() => router.push(`/rules/${encodeURIComponent(r.id)}?test=1`)} />
                                     <MenuItem icon={Copy} label="Duplicate" disabled={busy} onClick={() => duplicate(r.id)} />
+                                    {isAdmin ? (
+                                      <>
+                                        <div style={{ height: 1, background: "var(--border)", margin: "4px 0" }} />
+                                        <div style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--text-muted)", padding: "2px 8px 4px" }}>
+                                          Owning team
+                                        </div>
+                                        {ASSIGNABLE.map((t) => (
+                                          <MenuItem
+                                            key={t.id}
+                                            icon={Users}
+                                            label={r.ownerRole === t.id ? `${t.label} ✓` : t.label}
+                                            disabled={busy}
+                                            onClick={() => assignTeam(r.id, t.id)}
+                                          />
+                                        ))}
+                                        {r.ownerRole ? (
+                                          <MenuItem icon={Users} label="Unassign (all teams)" disabled={busy} onClick={() => assignTeam(r.id, null)} />
+                                        ) : null}
+                                        <div style={{ height: 1, background: "var(--border)", margin: "4px 0" }} />
+                                      </>
+                                    ) : null}
                                     <MenuItem icon={Trash2} label="Delete" danger disabled={busy} onClick={() => del(r.id, r.name)} />
                                   </div>
                                 </>

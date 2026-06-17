@@ -1,10 +1,13 @@
 import { requireWorkspace } from "@/lib/server/require-workspace";
 import { listRules, readRule, listNodeDefs } from "@/lib/server/workspace";
 import { validateRule, groupIssues } from "@/lib/rule/validate";
+import { getCurrentUser } from "@/lib/server/auth";
+import { canAccessRule } from "@/lib/server/auth/types";
 import { RulesClient, type EnrichedRule } from "./RulesClient";
 
 export default async function RulesPage() {
   const root = await requireWorkspace();
+  const user = await getCurrentUser();
   const summaries = await listRules(root);
   const nodeDefs = await listNodeDefs(root);
 
@@ -13,6 +16,8 @@ export default async function RulesPage() {
   // workspaces with <100 rules; we can paginate or cache server-side later.
   const enriched: EnrichedRule[] = [];
   for (const s of summaries) {
+    // Role-scoping: hide rules owned by other teams (admins see all).
+    if (user && !canAccessRule(user, s.ownerRole)) continue;
     const full = await readRule(root, s.id);
     if (!full) continue;
     const issues = validateRule(full, nodeDefs);
@@ -29,8 +34,10 @@ export default async function RulesPage() {
       validity: { errors: errors.length, warnings: warnings.length },
       testCount: full.tests.length,
       tags: full.tags,
+      ownerRole: s.ownerRole ?? null,
     });
   }
 
-  return <RulesClient rules={enriched} />;
+  const isAdmin = !!user?.permissions.includes("*");
+  return <RulesClient rules={enriched} isAdmin={isAdmin} />;
 }
