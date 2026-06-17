@@ -81,6 +81,22 @@ CREATE TABLE IF NOT EXISTS sessions (
   created_at TEXT,
   expires_at TEXT
 );
+
+-- API keys that secure the engine's runtime endpoints. Minted/revoked in the
+-- editor; the engine validates X-AERO-Key against key_hash (SHA-256) in this
+-- same db ("gold sync" — mint here, works against the engine immediately). Only
+-- the hash + a display prefix are stored; the full key is shown once.
+CREATE TABLE IF NOT EXISTS api_keys (
+  id           TEXT PRIMARY KEY,
+  name         TEXT,
+  prefix       TEXT,
+  key_hash     TEXT NOT NULL,
+  created_by   TEXT,
+  created_at   TEXT,
+  last_used_at TEXT,
+  revoked      INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
 `;
 
 export function dbPathFor(rootPath: string): string {
