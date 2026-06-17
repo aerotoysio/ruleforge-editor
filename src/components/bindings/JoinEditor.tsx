@@ -26,6 +26,7 @@ export function JoinEditor({
   const rightKey = lit("rightKey");
   const asField = lit("as");
   const mode = lit("mode") || "collect";
+  const onlyMatched = draft.onlyMatched?.kind === "literal" && draft.onlyMatched.value === true;
 
   const leftFields = useMemo(() => itemFields(inputSchema, left), [inputSchema, left]);
   const rightFields = useMemo(() => itemFields(inputSchema, right), [inputSchema, right]);
@@ -66,6 +67,10 @@ export function JoinEditor({
             <button type="button" onClick={() => setLit("mode", "first")} style={seg(mode === "first")}>first only</button>
           </div>
         </div>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-muted, #71717a)", cursor: "pointer", marginTop: 10 }}>
+          <input type="checkbox" checked={onlyMatched} onChange={(e) => setBinding("onlyMatched", e.target.checked ? { kind: "literal", value: true } : null)} />
+          Only keep items that have a match <span style={{ opacity: 0.7 }}>(inner join — drops left items with no match)</span>
+        </label>
       </section>
 
       {left && right && leftKey && rightKey && asField ? (

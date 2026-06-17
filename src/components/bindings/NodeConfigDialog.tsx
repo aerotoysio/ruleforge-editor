@@ -22,6 +22,7 @@ import { TextConditionsEditor, type StrCond } from "./TextConditionsEditor";
 import { loopVarsInScope } from "@/lib/rule/loop-vars";
 import { RequestFieldSelect } from "./RequestFieldSelect";
 import { JoinEditor } from "./JoinEditor";
+import { FilterListEditor } from "./FilterListEditor";
 import { walkSchema, type SchemaPathNode } from "@/lib/schema/path-walker";
 import { cn } from "@/lib/utils";
 import type { Asset, JsonSchema, NodeDef, NodePort, OutputTemplate, PortBinding, ReferenceSet, Rule } from "@/lib/types";
@@ -359,6 +360,20 @@ export function NodeConfigDialog({ open, onClose, instanceId }: Props) {
                   key="joineditor"
                   draft={draft}
                   setBinding={setBinding}
+                  inputSchema={rule.inputSchema}
+                />
+              );
+            }
+            // Filter-list node: array picker + type + reused conditions editor.
+            if (def.category === "filterList") {
+              if (port.name !== "source") return null;
+              return (
+                <FilterListEditor
+                  key="filterlist"
+                  draft={draft}
+                  setBinding={setBinding}
+                  extras={extrasDraft}
+                  setExtras={setExtrasDraft}
                   inputSchema={rule.inputSchema}
                 />
               );
