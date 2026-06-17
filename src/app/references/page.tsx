@@ -1,13 +1,29 @@
 import Link from "next/link";
-import { Plus, Database } from "lucide-react";
+import { Plus, Database, Columns3, Rows3 } from "lucide-react";
 import { requireWorkspace } from "@/lib/server/require-workspace";
 import { listReferences } from "@/lib/server/workspace";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
+import type { ReferenceSet } from "@/lib/types";
 
 export default async function ReferencesPage() {
   const root = await requireWorkspace();
   const references = await listReferences(root);
+
+  // Group by category (unset → "General"); "General" sorts last.
+  const groups = new Map<string, ReferenceSet[]>();
+  for (const r of references) {
+    const c = (r.category && r.category.trim()) || "General";
+    const arr = groups.get(c);
+    if (arr) arr.push(r);
+    else groups.set(c, [r]);
+  }
+  const groupList = [...groups.entries()].sort((a, b) => {
+    if (a[0] === "General") return 1;
+    if (b[0] === "General") return -1;
+    return a[0].localeCompare(b[0]);
+  });
+  const singleGeneral = groupList.length === 1 && groupList[0][0] === "General";
 
   return (
     <>
@@ -22,10 +38,12 @@ export default async function ReferencesPage() {
           </Link>
         }
       />
-      <div
-        className="flex-1 overflow-auto"
-        style={{ padding: "8px 28px 80px", background: "var(--bg)" }}
-      >
+      <div className="flex-1 overflow-auto" style={{ padding: "8px 28px 80px", background: "var(--bg)" }}>
+        <style>{`
+          .rf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:12px}
+          .rf-card{border:1px solid var(--border);border-radius:12px;background:var(--panel);padding:14px 15px;display:flex;flex-direction:column;gap:9px;min-height:116px;transition:border-color .12s, box-shadow .12s, transform .12s}
+          .rf-card:hover{border-color:var(--accent);box-shadow:var(--shadow-sm);transform:translateY(-1px)}
+        `}</style>
         {references.length === 0 ? (
           <EmptyState
             icon={<Database className="w-8 h-8" />}
@@ -40,46 +58,50 @@ export default async function ReferencesPage() {
             }
           />
         ) : (
-          <div className="tbl-wrap">
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Columns</th>
-                  <th className="num" style={{ width: 80 }}>Rows</th>
-                  <th className="num" style={{ width: 80 }}>v</th>
-                  <th style={{ width: 130 }}>Updated</th>
-                </tr>
-              </thead>
-              <tbody>
-                {references.map((ref) => (
-                  <tr key={ref.id} style={{ cursor: "pointer" }}>
-                    <td>
-                      <Link
-                        href={`/references/${encodeURIComponent(ref.id)}`}
-                        style={{ display: "flex", flexDirection: "column", gap: 1 }}
-                      >
-                        <span className="mono" style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
-                          {ref.id}
-                        </span>
-                        <span style={{ fontWeight: 500, color: "var(--text)" }}>{ref.name}</span>
+          <div className="flex flex-col" style={{ gap: 26 }}>
+            {groupList.map(([cat, refs]) => (
+              <section key={cat}>
+                {!singleGeneral ? (
+                  <div className="flex items-center gap-2" style={{ marginBottom: 11 }}>
+                    <Database className="w-4 h-4" style={{ color: "var(--text-muted)" }} strokeWidth={1.8} />
+                    <span style={{ fontSize: 14, fontWeight: 600, letterSpacing: "-0.01em", color: "var(--text)" }}>{cat}</span>
+                    <span className="mono" style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: "auto" }}>
+                      {refs.length} {refs.length === 1 ? "set" : "sets"}
+                    </span>
+                  </div>
+                ) : null}
+                <div className="rf-grid">
+                  {refs.map((ref) => {
+                    const cols = ref.columns ?? [];
+                    const colPreview = cols.slice(0, 4).join(", ") + (cols.length > 4 ? ` +${cols.length - 4}` : "");
+                    return (
+                      <Link key={ref.id} href={`/references/${encodeURIComponent(ref.id)}`} className="rf-card">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="truncate" style={{ fontWeight: 600, fontSize: 13.5, letterSpacing: "-0.01em", color: "var(--text)" }}>
+                              {ref.name}
+                            </div>
+                            <div className="mono truncate" style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 1 }}>{ref.id}</div>
+                          </div>
+                          <Database className="w-4 h-4" style={{ color: "var(--text-faint)", flexShrink: 0 }} strokeWidth={1.8} />
+                        </div>
+                        <div className="mono truncate" style={{ fontSize: 11.5, color: "var(--text-dim)" }} title={cols.join(", ")}>
+                          {cols.length ? colPreview : "no columns"}
+                        </div>
+                        <div className="flex items-center gap-3" style={{ marginTop: "auto", paddingTop: 2, fontSize: 11, color: "var(--text-muted)" }}>
+                          <span className="flex items-center gap-1"><Columns3 className="w-3 h-3" /> {cols.length}</span>
+                          <span className="flex items-center gap-1"><Rows3 className="w-3 h-3" /> {(ref.rows ?? []).length}</span>
+                          <span className="mono">v{ref.currentVersion ?? 1}</span>
+                          <span style={{ marginLeft: "auto", color: "var(--text-faint)" }}>
+                            {ref.updatedAt ? new Date(ref.updatedAt).toLocaleDateString() : ""}
+                          </span>
+                        </div>
                       </Link>
-                    </td>
-                    <td className="mono" style={{ color: "var(--text-dim)" }}>
-                      {(ref.columns ?? []).join(", ")}
-                    </td>
-                    <td className="num mono">{(ref.rows ?? []).length}</td>
-                    <td className="num mono">
-                      <span style={{ color: "var(--text-muted)" }}>v</span>
-                      {ref.currentVersion ?? 1}
-                    </td>
-                    <td className="muted">
-                      {ref.updatedAt ? new Date(ref.updatedAt).toLocaleDateString() : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
           </div>
         )}
       </div>

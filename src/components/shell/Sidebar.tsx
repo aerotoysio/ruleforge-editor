@@ -57,7 +57,7 @@ const ITEMS: Item[] = [
   { href: "/commands",     label: "Run commands", icon: Terminal,       group: "configure" },
   { href: "/keys",         label: "API keys",     icon: KeyRound,       group: "configure" },
   { href: "/integrations", label: "Integrations", icon: Plug,           group: "configure", disabled: true },
-  { href: "/team",         label: "Team & roles", icon: Users,          group: "configure", disabled: true },
+  { href: "/team",         label: "Team & roles", icon: Users,          group: "configure" },
   { href: "/settings",     label: "Settings",     icon: Settings,       group: "configure" },
 ];
 

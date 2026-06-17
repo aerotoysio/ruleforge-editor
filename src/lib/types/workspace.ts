@@ -27,6 +27,7 @@ export type ReferenceSet = {
   id: string;
   name: string;
   description?: string;
+  category?: string;
   currentVersion: number;
   columns: string[];
   rows: Record<string, unknown>[];
