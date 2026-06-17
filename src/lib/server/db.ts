@@ -53,6 +53,34 @@ CREATE TABLE IF NOT EXISTS compiled_rules (
   PRIMARY KEY (id, version)
 );
 CREATE INDEX IF NOT EXISTS idx_compiled_endpoint ON compiled_rules(endpoint, method, version);
+
+-- Auth / RBAC. Users + password hashes live here (workspace.db is gitignored, so
+-- they never leave the machine); the Anthropic key does NOT. Unused when
+-- RULEFORGE_AUTH_MODE=external (identity comes from the upstream PSS gateway).
+CREATE TABLE IF NOT EXISTS users (
+  id            TEXT PRIMARY KEY,
+  email         TEXT UNIQUE NOT NULL,
+  name          TEXT,
+  password_hash TEXT,
+  created_at    TEXT
+);
+CREATE TABLE IF NOT EXISTS roles (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL,
+  description TEXT,
+  permissions TEXT NOT NULL          -- JSON array of capability strings ("*" = all)
+);
+CREATE TABLE IF NOT EXISTS user_roles (
+  user_id TEXT NOT NULL,
+  role_id TEXT NOT NULL,
+  PRIMARY KEY (user_id, role_id)
+);
+CREATE TABLE IF NOT EXISTS sessions (
+  token      TEXT PRIMARY KEY,
+  user_id    TEXT NOT NULL,
+  created_at TEXT,
+  expires_at TEXT
+);
 `;
 
 export function dbPathFor(rootPath: string): string {
