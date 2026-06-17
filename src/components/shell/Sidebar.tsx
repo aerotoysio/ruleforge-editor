@@ -22,6 +22,7 @@ import {
   Filter,
   Terminal,
   LogOut,
+  KeyRound,
 } from "lucide-react";
 import { useWorkspace } from "./WorkspaceProvider";
 import { cn } from "@/lib/utils";
@@ -54,6 +55,7 @@ const ITEMS: Item[] = [
 
   // Configure — system surface
   { href: "/commands",     label: "Run commands", icon: Terminal,       group: "configure" },
+  { href: "/keys",         label: "API keys",     icon: KeyRound,       group: "configure" },
   { href: "/integrations", label: "Integrations", icon: Plug,           group: "configure", disabled: true },
   { href: "/team",         label: "Team & roles", icon: Users,          group: "configure", disabled: true },
   { href: "/settings",     label: "Settings",     icon: Settings,       group: "configure" },
