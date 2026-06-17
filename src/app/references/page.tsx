@@ -41,7 +41,7 @@ export default async function ReferencesPage() {
       <div className="flex-1 overflow-auto" style={{ padding: "8px 28px 80px", background: "var(--bg)" }}>
         <style>{`
           .rf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:12px}
-          .rf-card{border:1px solid var(--border);border-radius:12px;background:var(--panel);padding:14px 15px;display:flex;flex-direction:column;gap:9px;min-height:116px;transition:border-color .12s, box-shadow .12s, transform .12s}
+          .rf-card{border:1px solid var(--border);border-radius:7px;background:var(--panel);padding:14px 15px;display:flex;flex-direction:column;gap:9px;min-height:116px;transition:border-color .12s, box-shadow .12s, transform .12s}
           .rf-card:hover{border-color:var(--accent);box-shadow:var(--shadow-sm);transform:translateY(-1px)}
         `}</style>
         {references.length === 0 ? (

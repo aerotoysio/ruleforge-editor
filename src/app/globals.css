@@ -16,15 +16,16 @@
  *
  * Theme is selected via `data-theme="dark"` or `data-theme="light"` on <html>.
  * Density is selected via `data-density="compact|default|comfortable"`.
- * Accent hue is driven by the OKLCH `--accent-h` CSS var (default 232 = blue).
+ * Accent hue is driven by the OKLCH `--accent-h` CSS var (default 26 = AeroToys red).
  * ============================================================================ */
 
 :root {
-  /* Accent — single hue drives every primary surface via OKLCH. */
-  --accent-h: 232;
-  --accent: oklch(0.62 0.18 var(--accent-h));
-  --accent-strong: oklch(0.55 0.2 var(--accent-h));
-  --accent-soft: oklch(0.62 0.18 var(--accent-h) / 0.12);
+  /* Accent — single hue drives every primary surface via OKLCH.
+   * AeroToys brand red (hue ~26). Was blue (232). */
+  --accent-h: 26;
+  --accent: oklch(0.585 0.22 var(--accent-h));
+  --accent-strong: oklch(0.52 0.225 var(--accent-h));
+  --accent-soft: oklch(0.585 0.22 var(--accent-h) / 0.15);
   --accent-fg: #ffffff;
 
   /* Density — drives row heights and cell padding across tables. */
@@ -32,10 +33,10 @@
   --cell-px: 14px;
   --gap: 16px;
 
-  /* Radii — design's scale (not shadcn's). */
-  --radius-sm: 6px;
-  --radius: 8px;
-  --radius-lg: 12px;
+  /* Radii — sharp, industrial edges (AeroToys theme). Was 6/8/12. */
+  --radius-sm: 3px;
+  --radius: 4px;
+  --radius-lg: 7px;
 
   /* Graph-only semantic colours (canvas edges, node strokes). */
   --color-pass: #2e7d4f;
@@ -190,27 +191,27 @@
   --sidebar-ring:                 var(--accent);
 }
 
-/* Default to light if the user hasn't picked. Mirrors [data-theme="light"]. */
+/* Default to the AeroToys dark theme if the user hasn't picked. Mirrors [data-theme="dark"]. */
 :root:not([data-theme]) {
-  --bg: #fafaf9;
-  --panel: #ffffff;
-  --panel-2: #f7f7f6;
-  --elev: #ffffff;
-  --border: #e7e7e4;
-  --border-strong: #d4d4d1;
-  --text: #0a0a0a;
-  --text-dim: #3f3f46;
+  --bg: #0a0a0b;
+  --panel: #101012;
+  --panel-2: #16161a;
+  --elev: #1c1c21;
+  --border: #232328;
+  --border-strong: #2e2e35;
+  --text: #f4f4f5;
+  --text-dim: #a1a1aa;
   --text-muted: #71717a;
-  --text-faint: #a1a1aa;
-  --success: oklch(0.55 0.15 155);
-  --success-soft: oklch(0.55 0.15 155 / 0.1);
-  --warn: oklch(0.6 0.16 75);
-  --warn-soft: oklch(0.6 0.16 75 / 0.12);
-  --danger: oklch(0.58 0.2 25);
-  --danger-soft: oklch(0.58 0.2 25 / 0.1);
-  --shadow-sm: 0 1px 2px rgba(15, 15, 20, 0.05);
-  --shadow-md: 0 8px 24px rgba(15, 15, 20, 0.08);
-  color-scheme: light;
+  --text-faint: #52525b;
+  --success: oklch(0.7 0.16 155);
+  --success-soft: oklch(0.7 0.16 155 / 0.14);
+  --warn: oklch(0.78 0.16 75);
+  --warn-soft: oklch(0.78 0.16 75 / 0.14);
+  --danger: oklch(0.68 0.2 25);
+  --danger-soft: oklch(0.68 0.2 25 / 0.14);
+  --shadow-sm: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 8px 24px rgba(0, 0, 0, 0.45);
+  color-scheme: dark;
   --background: var(--bg);
   --foreground: var(--text);
   --card: var(--panel);

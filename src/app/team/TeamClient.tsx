@@ -26,7 +26,7 @@ const CAPS: { id: string; label: string }[] = [
 function chip(on: boolean): React.CSSProperties {
   return {
     padding: "3px 9px",
-    borderRadius: 999,
+    borderRadius: 4,
     fontSize: 11.5,
     fontWeight: 600,
     cursor: "pointer",
@@ -208,7 +208,7 @@ export function TeamClient({
         </div>
 
         {addU && (
-          <div style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 14, marginBottom: 14, display: "flex", flexDirection: "column", gap: 10, background: "var(--panel)" }}>
+          <div style={{ border: "1px solid var(--border)", borderRadius: 6, padding: 14, marginBottom: 14, display: "flex", flexDirection: "column", gap: 10, background: "var(--panel)" }}>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <div style={{ flex: "1 1 200px" }}><Input value={uEmail} onChange={(e) => setUEmail(e.target.value)} placeholder="email@aerotoys.io" /></div>
               <div style={{ flex: "1 1 160px" }}><Input value={uName} onChange={(e) => setUName(e.target.value)} placeholder="Display name (optional)" /></div>
@@ -232,7 +232,7 @@ export function TeamClient({
 
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {users.map((usr) => (
-            <div key={usr.id} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", background: "var(--panel)" }}>
+            <div key={usr.id} style={{ border: "1px solid var(--border)", borderRadius: 6, padding: "12px 14px", background: "var(--panel)" }}>
               <div className="flex items-center" style={{ gap: 10 }}>
                 <div style={{ width: 30, height: 30, borderRadius: 999, background: "var(--accent-soft, rgba(139,92,246,0.16))", color: "var(--accent,#a855f7)", display: "grid", placeItems: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
                   {(usr.name || usr.email).slice(0, 1).toUpperCase()}
@@ -275,7 +275,7 @@ export function TeamClient({
         </div>
 
         {addR && (
-          <div style={{ border: "1px solid var(--border)", borderRadius: 10, padding: 14, marginBottom: 14, display: "flex", flexDirection: "column", gap: 10, background: "var(--panel)" }}>
+          <div style={{ border: "1px solid var(--border)", borderRadius: 6, padding: 14, marginBottom: 14, display: "flex", flexDirection: "column", gap: 10, background: "var(--panel)" }}>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <div style={{ flex: "1 1 180px" }}><Input value={rName} onChange={(e) => setRName(e.target.value)} placeholder="Role name — e.g. Pricing Team" /></div>
               <div style={{ flex: "2 1 240px" }}><Input value={rDesc} onChange={(e) => setRDesc(e.target.value)} placeholder="Description (optional)" /></div>
@@ -297,7 +297,7 @@ export function TeamClient({
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(320px,1fr))", gap: 12 }}>
           {roles.map((role) => (
-            <div key={role.id} style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 14, background: "var(--panel)", display: "flex", flexDirection: "column", gap: 10 }}>
+            <div key={role.id} style={{ border: "1px solid var(--border)", borderRadius: 7, padding: 14, background: "var(--panel)", display: "flex", flexDirection: "column", gap: 10 }}>
               <div className="flex items-start" style={{ gap: 8 }}>
                 <div className="min-w-0" style={{ flex: 1 }}>
                   <div style={{ fontWeight: 600, fontSize: 13.5 }}>{role.name}</div>

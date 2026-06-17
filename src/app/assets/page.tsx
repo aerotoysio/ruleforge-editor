@@ -40,7 +40,7 @@ export default async function AssetsPage() {
       <div className="flex-1 overflow-auto" style={{ padding: "8px 28px 80px", background: "var(--bg)" }}>
         <style>{`
           .rf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:12px}
-          .rf-card{border:1px solid var(--border);border-radius:12px;background:var(--panel);padding:13px 15px;display:flex;flex-direction:column;gap:8px;min-height:108px;transition:border-color .12s, box-shadow .12s, transform .12s}
+          .rf-card{border:1px solid var(--border);border-radius:7px;background:var(--panel);padding:13px 15px;display:flex;flex-direction:column;gap:8px;min-height:108px;transition:border-color .12s, box-shadow .12s, transform .12s}
           .rf-card:hover{border-color:var(--accent);box-shadow:var(--shadow-sm);transform:translateY(-1px)}
         `}</style>
         {assets.length === 0 ? (
