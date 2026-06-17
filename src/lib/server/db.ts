@@ -97,6 +97,39 @@ CREATE TABLE IF NOT EXISTS api_keys (
   revoked      INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_api_keys_hash ON api_keys(key_hash);
+
+-- Fleet registry. Engine instances self-register via heartbeat (POST
+-- /api/fleet/heartbeat); the Overview reads this for per-engine health.
+CREATE TABLE IF NOT EXISTS engines (
+  id             TEXT PRIMARY KEY,
+  name           TEXT,
+  url            TEXT,
+  version        TEXT,
+  rule_source    TEXT,
+  binding_count  INTEGER,
+  generation     TEXT,
+  uptime_seconds INTEGER,
+  last_seen_at   TEXT
+);
+
+-- Release audit log + live-binding source of truth. Every publish / rollback /
+-- unpublish is an immutable row; the live version per endpoint is derived from
+-- it — so a draft can never go live, and any engine response (which carries its
+-- rule version) traces back to exactly when/who/how that version went live.
+CREATE TABLE IF NOT EXISTS releases (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  rule_id      TEXT NOT NULL,
+  version      INTEGER NOT NULL,
+  endpoint     TEXT,
+  method       TEXT,
+  action       TEXT NOT NULL,   -- publish | rollback | unpublish
+  status       TEXT NOT NULL,   -- live | scheduled | superseded
+  effective_at TEXT,            -- when it goes / went live (ISO)
+  created_at   TEXT NOT NULL,
+  created_by   TEXT,
+  note         TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_releases_rule ON releases(rule_id, id);
 `;
 
 export function dbPathFor(rootPath: string): string {

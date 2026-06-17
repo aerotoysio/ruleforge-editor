@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { getDb } from "./db";
+import { getLiveBindings } from "./release";
 
 // ─── Control-plane sync surface ──────────────────────────────────────────────
 // Read-only projection of the central workspace.db that the engine fleet pulls
@@ -27,11 +28,26 @@ function sha256(s: string): string {
   return crypto.createHash("sha256").update(s).digest("hex");
 }
 
-export function buildManifest(rootPath: string): SyncManifest {
+export function buildManifest(rootPath: string, opts?: { includeDrafts?: boolean }): SyncManifest {
   const db = getDb(rootPath);
-  const rules = (db.prepare("SELECT id, version, endpoint, method, status FROM compiled_rules ORDER BY id, version").all() as Array<{ id: string; version: number; endpoint: string; method: string; status: string | null }>).map(
-    (r) => ({ id: r.id, version: r.version, endpoint: r.endpoint, method: r.method, status: r.status ?? null }),
-  );
+  let rules: ManifestRule[];
+  if (opts?.includeDrafts) {
+    // Test engines: every compiled version (the engine binds the latest, incl. drafts).
+    rules = (db.prepare("SELECT id, version, endpoint, method, status FROM compiled_rules ORDER BY id, version").all() as Array<{ id: string; version: number; endpoint: string; method: string; status: string | null }>).map(
+      (r) => ({ id: r.id, version: r.version, endpoint: r.endpoint, method: r.method, status: r.status ?? null }),
+    );
+  } else {
+    // Fleet: ONLY the live published binding per endpoint. Drafts never ship — a
+    // restarted engine re-pulls only what has actually been published.
+    const live = getLiveBindings(rootPath);
+    const get = db.prepare("SELECT id, version, endpoint, method, status FROM compiled_rules WHERE id = ? AND version = ? LIMIT 1");
+    rules = [];
+    for (const { ruleId, version } of live.values()) {
+      const row = (get.all(ruleId, version) as Array<{ id: string; version: number; endpoint: string; method: string; status: string | null }>)[0];
+      if (row) rules.push({ id: row.id, version: row.version, endpoint: row.endpoint, method: row.method, status: row.status ?? null });
+    }
+    rules.sort((a, b) => a.id.localeCompare(b.id) || a.version - b.version);
+  }
   const referenceSets = (db.prepare("SELECT id, version FROM reference_sets ORDER BY id").all() as Array<{ id: string; version: number | null }>).map(
     (r) => ({ id: r.id, version: r.version ?? 1 }),
   );
