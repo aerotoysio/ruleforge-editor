@@ -41,12 +41,13 @@ export function userHasPermission(user: AuthUser, perm: string): boolean {
 }
 
 /**
- * Rule-scoping: admins ("*") see/act on everything; a rule with no ownerRole is
- * visible to all signed-in users; otherwise the user must belong to the owning
- * role. This is the "Tax Team → Tax rules" boundary.
+ * Rule-scoping: admins ("*") see/act on everything; otherwise a user sees ONLY
+ * rules owned by a team they belong to. Unassigned rules are admin-only — assign
+ * a rule to a team to make that team see it. This is the "Tax Team → Tax rules"
+ * boundary; new rules created by a non-admin auto-assign to their team.
  */
 export function canAccessRule(user: AuthUser, ownerRole: string | null | undefined): boolean {
-  if (user.permissions.includes("*")) return true;
-  if (!ownerRole) return true;
-  return user.roles.includes(ownerRole);
+  if (user.permissions.includes("*")) return true; // admins see everything
+  if (!ownerRole) return false;                     // unassigned → admin-only
+  return user.roles.includes(ownerRole);            // a team sees only its own rules
 }

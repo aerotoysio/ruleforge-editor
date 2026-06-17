@@ -29,6 +29,11 @@ export async function POST(req: NextRequest) {
   if (!rule.id || !rule.name) {
     return NextResponse.json({ error: "Rule must have id and name" }, { status: 400 });
   }
+  // Non-admins: default a new rule to their own team so it stays visible to them
+  // under team scoping (otherwise it would be unassigned = admin-only).
+  if (!user.permissions.includes("*") && !rule.ownerRole && user.roles.length) {
+    rule.ownerRole = user.roles[0];
+  }
   // Non-admins can't mint a rule owned by a team they're not in.
   if (rule.ownerRole && !canAccessRule(user, rule.ownerRole)) {
     return NextResponse.json({ error: "Cannot create a rule owned by another team" }, { status: 403 });

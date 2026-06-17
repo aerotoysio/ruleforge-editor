@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Workflow, ArrowRight } from "lucide-react";
 
 const DEMO = [
@@ -22,7 +21,6 @@ const fieldStyle: React.CSSProperties = {
 };
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("demo@aerotoys.io");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -39,8 +37,9 @@ export default function LoginPage() {
       });
       if (res.ok) {
         const next = new URLSearchParams(window.location.search).get("next") || "/";
-        router.push(next);
-        router.refresh();
+        // Full reload so the whole app re-renders for the new user — the sidebar
+        // user menu (logout) and the server-rendered, role-scoped rule list.
+        window.location.href = next;
       } else {
         const d = (await res.json().catch(() => ({}))) as { error?: string };
         setError(d.error || "Login failed");
