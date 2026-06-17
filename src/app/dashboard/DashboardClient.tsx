@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { RefreshCw, Database, LayoutTemplate, Package, Boxes } from "lucide-react";
+import { RefreshCw, Database, LayoutTemplate, Package, Boxes, Server } from "lucide-react";
 import { PageHeader } from "@/components/ui/PageHeader";
 
 export type DashboardStats = {
@@ -19,17 +19,17 @@ export type DashboardStats = {
   userLabel: string | null;
 };
 
-type EngineStatus = {
-  configured: boolean;
-  online?: boolean;
-  latencyMs?: number;
-  url?: string;
-  engineVersion?: string;
-  uptimeSeconds?: number;
-  bindingCount?: number;
-  ruleSource?: string;
-  referenceSource?: string;
-  error?: string;
+type Engine = {
+  id: string;
+  name: string | null;
+  url: string | null;
+  version: string | null;
+  ruleSource: string | null;
+  bindingCount: number | null;
+  generation: string | null;
+  uptimeSeconds: number | null;
+  secondsAgo: number;
+  online: boolean;
 };
 
 const sectionTitle: React.CSSProperties = {
@@ -41,7 +41,7 @@ const sectionTitle: React.CSSProperties = {
   marginBottom: 10,
 };
 
-function fmtUptime(s?: number): string {
+function fmtUptime(s?: number | null): string {
   if (s == null) return "—";
   const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
   if (d) return `${d}d ${h}h`;
@@ -49,25 +49,32 @@ function fmtUptime(s?: number): string {
   if (m) return `${m}m`;
   return `${s}s`;
 }
+function seenAgo(s: number): string {
+  if (s < 2) return "just now";
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  return m < 60 ? `${m}m ago` : `${Math.floor(m / 60)}h ago`;
+}
 function titleCase(id: string): string {
   return id.split(/[-_]/).map((w) => (w ? w[0].toUpperCase() + w.slice(1) : "")).join(" ");
 }
 
 export function DashboardClient({ stats }: { stats: DashboardStats }) {
-  const [eng, setEng] = useState<EngineStatus | null>(null);
+  const [engines, setEngines] = useState<Engine[]>([]);
   const [loading, setLoading] = useState(true);
 
   const probe = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch("/api/engine/status");
-      setEng(await r.json());
+      const r = await fetch("/api/fleet/engines");
+      const d = await r.json();
+      setEngines(Array.isArray(d.engines) ? d.engines : []);
     } catch {
-      setEng({ configured: stats.engineConfigured, online: false });
+      /* keep last */
     } finally {
       setLoading(false);
     }
-  }, [stats.engineConfigured]);
+  }, []);
 
   useEffect(() => {
     probe();
@@ -75,11 +82,11 @@ export function DashboardClient({ stats }: { stats: DashboardStats }) {
     return () => clearInterval(t);
   }, [probe]);
 
-  const online = eng?.online === true;
+  const onlineCount = engines.filter((e) => e.online).length;
+  // Sync-freshness: are all online engines on the same generation?
+  const gens = new Set(engines.filter((e) => e.online && e.generation).map((e) => e.generation));
   const teams = Object.entries(stats.byTeam).sort((a, b) => b[1] - a[1]);
   const cats = Object.entries(stats.byCategory).sort((a, b) => b[1] - a[1]).slice(0, 8);
-  const dotColor = !eng?.configured ? "var(--text-faint)" : online ? "var(--success)" : "var(--danger)";
-  const statusLabel = !eng?.configured ? "Not configured" : online ? "Online" : "Offline";
 
   return (
     <>
@@ -88,64 +95,74 @@ export function DashboardClient({ stats }: { stats: DashboardStats }) {
         .dash-stat{border:1px solid var(--border);border-radius:7px;background:var(--panel);padding:14px 16px;display:flex;flex-direction:column;gap:3px;transition:border-color .12s}
         a:hover>.dash-stat{border-color:var(--accent)}
         .dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+        .eng-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(266px,1fr));gap:12px}
         .dash-num{font-size:26px;font-weight:700;letter-spacing:-0.02em;line-height:1.1}
         .dash-lbl{font-size:11.5px;color:var(--text-muted);font-weight:500}
         .dash-bar-track{height:6px;border-radius:3px;background:var(--panel-2);overflow:hidden}
         .dash-bar-fill{height:100%;background:var(--accent);border-radius:3px}
+        .refresh-btn{border:1px solid var(--border);border-radius:4px;background:var(--panel);color:var(--text-dim);width:28px;height:28px;display:grid;place-items:center;cursor:pointer}
       `}</style>
 
       <PageHeader
         eyebrow="Workspace"
         title="Overview"
-        description={`Live engine health and rule statistics${stats.isAdmin ? "" : " for your team"}.`}
+        description={`Live engine fleet health and rule statistics${stats.isAdmin ? "" : " for your team"}.`}
       />
 
       <div style={{ padding: "8px 28px 48px", maxWidth: 1080, display: "flex", flexDirection: "column", gap: 26 }}>
-        {/* ENGINE SERVICE HEALTH */}
+        {/* ENGINE FLEET */}
         <section>
-          <h2 style={sectionTitle}>Engine service</h2>
-          <div className="dash-card">
-            <div className="flex items-center" style={{ gap: 10 }}>
-              <span
-                style={{
-                  width: 9,
-                  height: 9,
-                  borderRadius: 999,
-                  background: dotColor,
-                  boxShadow: online ? "0 0 0 3px rgba(34,197,94,0.22)" : "none",
-                  flexShrink: 0,
-                }}
-              />
-              <span style={{ fontWeight: 600, fontSize: 14 }}>{statusLabel}</span>
-              {eng?.url ? <span className="mono" style={{ fontSize: 11.5, color: "var(--text-muted)" }}>{eng.url}</span> : null}
-              <button
-                onClick={probe}
-                title="Refresh"
-                style={{ marginLeft: "auto", border: "1px solid var(--border)", borderRadius: 4, background: "var(--panel)", color: "var(--text-dim)", width: 28, height: 28, display: "grid", placeItems: "center", cursor: "pointer" }}
-              >
-                <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
-              </button>
-            </div>
-            {!eng?.configured ? (
-              <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 10 }}>
-                No engine endpoint configured. Set it in{" "}
-                <Link href="/settings" style={{ color: "var(--accent)" }}>Settings → Engine runtime</Link>.
-              </div>
-            ) : !online ? (
-              <div style={{ fontSize: 12.5, color: "var(--text-muted)", marginTop: 12 }}>
-                Engine not reachable{eng?.error ? ` — ${eng.error}` : ""}. It may be stopped or still starting.
-              </div>
-            ) : (
-              <div className="dash-grid" style={{ marginTop: 16 }}>
-                <Metric label="Version" value={eng?.engineVersion ?? "—"} mono />
-                <Metric label="Uptime" value={fmtUptime(eng?.uptimeSeconds)} />
-                <Metric label="Live bindings" value={String(eng?.bindingCount ?? "—")} />
-                <Metric label="Latency" value={eng?.latencyMs != null ? `${eng.latencyMs} ms` : "—"} />
-                <Metric label="Rule source" value={eng?.ruleSource ?? "—"} />
-                <Metric label="Reference source" value={eng?.referenceSource ?? "—"} />
-              </div>
-            )}
+          <div className="flex items-center" style={{ gap: 8, marginBottom: 10 }}>
+            <h2 style={{ ...sectionTitle, marginBottom: 0 }}>Engine fleet</h2>
+            {engines.length > 0 ? (
+              <span className="mono" style={{ fontSize: 11, color: onlineCount === engines.length ? "var(--success)" : "var(--text-muted)" }}>
+                {onlineCount}/{engines.length} online
+              </span>
+            ) : null}
+            {engines.length > 0 ? (
+              <span style={{ fontSize: 11, color: gens.size <= 1 ? "var(--text-muted)" : "var(--warn)" }}>
+                · {gens.size <= 1 ? "in sync" : `${gens.size} versions live`}
+              </span>
+            ) : null}
+            <button onClick={probe} title="Refresh" className="refresh-btn" style={{ marginLeft: "auto" }}>
+              <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+            </button>
           </div>
+
+          {engines.length === 0 ? (
+            <div className="dash-card" style={{ display: "flex", gap: 10, alignItems: "flex-start", color: "var(--text-muted)" }}>
+              <Server size={18} style={{ flexShrink: 0, marginTop: 1 }} />
+              <div style={{ fontSize: 12.5 }}>
+                No engines have registered yet. Start one with <code className="mono">RULEFORGE_CONTROL_URL</code> pointing at this editor and it appears here within ~15s.
+              </div>
+            </div>
+          ) : (
+            <div className="eng-grid">
+              {engines.map((e) => (
+                <div key={e.id} className="dash-card" style={{ opacity: e.online ? 1 : 0.55, display: "flex", flexDirection: "column", gap: 7 }}>
+                  <div className="flex items-center justify-between" style={{ gap: 8 }}>
+                    <div className="flex items-center" style={{ gap: 8, minWidth: 0 }}>
+                      <span style={{ width: 9, height: 9, borderRadius: 999, background: e.online ? "var(--success)" : "var(--danger)", boxShadow: e.online ? "0 0 0 3px rgba(34,197,94,0.22)" : "none", flexShrink: 0 }} />
+                      <span className="truncate" style={{ fontWeight: 600, fontSize: 13.5 }}>{e.name || e.id}</span>
+                    </div>
+                    <span className="mono" style={{ fontSize: 10.5, color: "var(--text-muted)", flexShrink: 0 }}>{e.version ?? "—"}</span>
+                  </div>
+                  <div className="mono truncate" style={{ fontSize: 11, color: "var(--text-muted)" }}>{e.url ?? e.id}</div>
+                  <div className="flex items-center" style={{ gap: 8, fontSize: 11.5, color: "var(--text-dim)", flexWrap: "wrap" }}>
+                    <span><b style={{ color: "var(--text)" }}>{e.bindingCount ?? "—"}</b> bindings</span>
+                    <span style={{ color: "var(--text-faint)" }}>·</span>
+                    <span>up {fmtUptime(e.uptimeSeconds)}</span>
+                    <span style={{ color: "var(--text-faint)" }}>·</span>
+                    <span className="mono">{e.ruleSource ?? "—"}</span>
+                  </div>
+                  <div className="flex items-center justify-between" style={{ fontSize: 10.5, color: "var(--text-faint)" }}>
+                    <span>{e.online ? "seen " : "last seen "}{seenAgo(e.secondsAgo)}</span>
+                    {e.generation ? <span className="mono" title={`sync generation ${e.generation}`}>gen {e.generation.slice(0, 7)}</span> : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {/* RULES */}
@@ -175,15 +192,6 @@ export function DashboardClient({ stats }: { stats: DashboardStats }) {
         </section>
       </div>
     </>
-  );
-}
-
-function Metric({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <div>
-      <div className="dash-lbl">{label}</div>
-      <div style={{ fontSize: 14, fontWeight: 600, fontFamily: mono ? "var(--font-mono, ui-monospace, monospace)" : undefined, marginTop: 2 }}>{value}</div>
-    </div>
   );
 }
 
