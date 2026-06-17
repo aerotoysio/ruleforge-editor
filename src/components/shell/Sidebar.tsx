@@ -40,7 +40,7 @@ type Item = {
 
 const ITEMS: Item[] = [
   // Workspace — primary build flow
-  { href: "/dashboard",  label: "Overview",      icon: LayoutDashboard, group: "workspace", disabled: true },
+  { href: "/dashboard",  label: "Overview",      icon: LayoutDashboard, group: "workspace" },
   { href: "/rules",      label: "Rules",         icon: FileCog,         group: "workspace" },
   { href: "/audit",      label: "Audit log",     icon: History,         group: "workspace", disabled: true },
 
