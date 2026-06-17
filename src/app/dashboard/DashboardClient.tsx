@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { RefreshCw, Database, LayoutTemplate, Package, Boxes, Server } from "lucide-react";
+import { RefreshCw, Database, LayoutTemplate, Package, Boxes, Server, UploadCloud } from "lucide-react";
+import { toast } from "sonner";
 import { PageHeader } from "@/components/ui/PageHeader";
 
 export type DashboardStats = {
@@ -62,6 +63,7 @@ function titleCase(id: string): string {
 export function DashboardClient({ stats }: { stats: DashboardStats }) {
   const [engines, setEngines] = useState<Engine[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pushing, setPushing] = useState(false);
 
   const probe = useCallback(async () => {
     setLoading(true);
@@ -81,6 +83,24 @@ export function DashboardClient({ stats }: { stats: DashboardStats }) {
     const t = setInterval(probe, 5000);
     return () => clearInterval(t);
   }, [probe]);
+
+  async function pushToFleet() {
+    setPushing(true);
+    try {
+      const r = await fetch("/api/fleet/publish", { method: "POST" });
+      const d = await r.json();
+      if (!r.ok) {
+        toast.error(d.error ?? "Publish failed");
+        return;
+      }
+      toast.success(`Pushed to ${d.refreshed}/${d.total} engine${d.total === 1 ? "" : "s"} — re-pulling latest`);
+      setTimeout(probe, 800); // let them re-sync, then refresh the view
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setPushing(false);
+    }
+  }
 
   const onlineCount = engines.filter((e) => e.online).length;
   // Sync-freshness: are all online engines on the same generation?
@@ -124,7 +144,15 @@ export function DashboardClient({ stats }: { stats: DashboardStats }) {
                 · {gens.size <= 1 ? "in sync" : `${gens.size} versions live`}
               </span>
             ) : null}
-            <button onClick={probe} title="Refresh" className="refresh-btn" style={{ marginLeft: "auto" }}>
+            <button
+              onClick={pushToFleet}
+              disabled={pushing || engines.length === 0}
+              title="Refresh every registered engine to the latest published rules"
+              style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, height: 28, padding: "0 11px", border: 0, borderRadius: 4, background: "var(--accent)", color: "#fff", fontSize: 12, fontWeight: 600, cursor: pushing || engines.length === 0 ? "default" : "pointer", opacity: pushing || engines.length === 0 ? 0.6 : 1 }}
+            >
+              <UploadCloud size={13} /> {pushing ? "Pushing…" : "Push to fleet"}
+            </button>
+            <button onClick={probe} title="Refresh" className="refresh-btn">
               <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
             </button>
           </div>
