@@ -12,6 +12,7 @@ type Initial = {
   rootPath: string | null;
   recentRoots: string[];
   engineUrl: string;
+  engineApiKey: string;
   engineCliPath: string;
   documentForgeUrl: string;
   ollamaUrl: string;
@@ -38,6 +39,7 @@ export function SettingsClient({ initial }: { initial: Initial }) {
 
   const [rootPath, setRootPath] = useState(initial.rootPath ?? "");
   const [engineUrl, setEngineUrl] = useState(initial.engineUrl);
+  const [engineApiKey, setEngineApiKey] = useState(initial.engineApiKey);
   const [engineCliPath, setEngineCliPath] = useState(initial.engineCliPath);
   const [documentForgeUrl, setDocumentForgeUrl] = useState(initial.documentForgeUrl);
   const [ollamaUrl, setOllamaUrl] = useState(initial.ollamaUrl || "http://localhost:11434");
@@ -56,6 +58,7 @@ export function SettingsClient({ initial }: { initial: Initial }) {
     return (
       rootPath !== (initial.rootPath ?? "") ||
       engineUrl !== initial.engineUrl ||
+      engineApiKey !== initial.engineApiKey ||
       engineCliPath !== initial.engineCliPath ||
       documentForgeUrl !== initial.documentForgeUrl ||
       ollamaUrl !== (initial.ollamaUrl || "http://localhost:11434") ||
@@ -64,7 +67,7 @@ export function SettingsClient({ initial }: { initial: Initial }) {
       anthropicApiKey !== initial.anthropicApiKey ||
       anthropicModel !== (initial.anthropicModel || "claude-opus-4-8")
     );
-  }, [rootPath, engineUrl, engineCliPath, documentForgeUrl, ollamaUrl, ollamaModel, aiProvider, anthropicApiKey, anthropicModel, initial]);
+  }, [rootPath, engineUrl, engineApiKey, engineCliPath, documentForgeUrl, ollamaUrl, ollamaModel, aiProvider, anthropicApiKey, anthropicModel, initial]);
 
   async function loadModels() {
     setModelsError(null);
@@ -95,6 +98,7 @@ export function SettingsClient({ initial }: { initial: Initial }) {
         body: JSON.stringify({
           rootPath: rootPath.trim(),
           engineUrl: engineUrl.trim() || null,
+          engineApiKey: engineApiKey.trim() || null,
           engineCliPath: engineCliPath.trim() || null,
           documentForgeUrl: documentForgeUrl.trim() || null,
           ollamaUrl: ollamaUrl.trim() || null,
@@ -262,14 +266,25 @@ export function SettingsClient({ initial }: { initial: Initial }) {
                 </Row>
                 <Row
                   name="HTTP endpoint"
-                  desc="(Not yet used) RuleForge.Api base URL for HTTP-mode evaluation."
+                  desc="RuleForge.Api base URL. Used for warm-engine test runs and the publish refresh ping."
                 >
                   <Input
                     value={engineUrl}
                     onChange={(e) => setEngineUrl(e.target.value)}
-                    placeholder="http://localhost:5000"
+                    placeholder="http://localhost:5050"
                     className="mono"
-                    disabled
+                  />
+                </Row>
+                <Row
+                  name="Engine API key"
+                  desc="Sent as X-AERO-Key on the editor's engine calls. Only needed once you mint keys (enforcement on) — paste one from the API keys page so the editor's own test/refresh calls keep working."
+                >
+                  <Input
+                    value={engineApiKey}
+                    onChange={(e) => setEngineApiKey(e.target.value)}
+                    placeholder="rfk_…"
+                    className="mono"
+                    type="password"
                   />
                 </Row>
                 <Row

@@ -31,9 +31,11 @@ async function fireRefresh(): Promise<void> {
     const settings = await readSettings();
     if (!settings.engineUrl) return;
     const base = settings.engineUrl.replace(/\/$/, "");
+    const headers: Record<string, string> = { "content-type": "application/json" };
+    if (settings.engineApiKey) headers["X-AERO-Key"] = settings.engineApiKey;
     await fetch(`${base}/admin/refresh`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers,
       body: "{}",
       signal: AbortSignal.timeout(2000),
     });

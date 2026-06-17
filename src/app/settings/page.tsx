@@ -11,6 +11,7 @@ export default async function SettingsPage() {
         rootPath: activeRoot ?? settings.rootPath ?? null,
         recentRoots: settings.recentRoots,
         engineUrl: settings.engineUrl ?? "",
+        engineApiKey: settings.engineApiKey ?? "",
         engineCliPath: settings.engineCliPath ?? "",
         documentForgeUrl: settings.documentForgeUrl ?? "",
         ollamaUrl: settings.ollamaUrl ?? "",

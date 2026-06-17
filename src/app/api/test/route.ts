@@ -142,7 +142,7 @@ export async function POST(req: NextRequest) {
 
   if (wantHttp) {
     // ── HTTP path ────────────────────────────────────────────────────────
-    const httpResult = await callEngineHttp(settings.engineUrl!, rule.method, rule.endpoint, body.payload);
+    const httpResult = await callEngineHttp(settings.engineUrl!, rule.method, rule.endpoint, body.payload, settings.engineApiKey);
     const tEnd = Date.now();
 
     if (httpResult.kind === "ok") {
@@ -251,16 +251,19 @@ async function callEngineHttp(
   method: string,
   endpoint: string,
   payload: unknown,
+  apiKey?: string,
 ): Promise<
   | { kind: "ok"; envelope: unknown }
   | { kind: "err"; detail: string }
 > {
   const base = engineUrl.replace(/\/$/, "");
   const url = `${base}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  if (apiKey) headers["X-AERO-Key"] = apiKey;
   try {
     const res = await fetch(url, {
       method,
-      headers: { "content-type": "application/json" },
+      headers,
       body: method.toUpperCase() === "GET" ? undefined : JSON.stringify(payload),
       // Give a fast engine 2s to respond — anything slower means it's
       // probably not running (or cold-starting itself), and we should

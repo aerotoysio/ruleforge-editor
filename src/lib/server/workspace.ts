@@ -37,6 +37,7 @@ type AppSettings = {
   rootPath: string | null;
   recentRoots: string[];
   engineUrl?: string;
+  engineApiKey?: string;
   engineCliPath?: string;
   documentForgeUrl?: string;
   documentForgeDatabase?: string;
@@ -55,6 +56,7 @@ export async function readSettings(): Promise<AppSettings> {
       rootPath: parsed.rootPath ?? null,
       recentRoots: parsed.recentRoots ?? [],
       engineUrl: parsed.engineUrl,
+      engineApiKey: parsed.engineApiKey,
       engineCliPath: parsed.engineCliPath,
       documentForgeUrl: parsed.documentForgeUrl,
       documentForgeDatabase: parsed.documentForgeDatabase,
@@ -71,7 +73,11 @@ export async function readSettings(): Promise<AppSettings> {
 
 export async function writeSettings(next: Partial<AppSettings>): Promise<AppSettings> {
   const current = await readSettings();
-  const merged: AppSettings = { ...current, ...next };
+  // Only overwrite keys explicitly provided: `undefined` means "leave as-is"
+  // (so a partial update can't wipe unrelated fields like rootPath); pass `null`
+  // to clear a field.
+  const provided = Object.fromEntries(Object.entries(next).filter(([, v]) => v !== undefined));
+  const merged: AppSettings = { ...current, ...(provided as Partial<AppSettings>) };
   if (merged.rootPath) {
     const recent = (merged.recentRoots ?? []).filter((p) => p !== merged.rootPath);
     merged.recentRoots = [merged.rootPath, ...recent].slice(0, 10);

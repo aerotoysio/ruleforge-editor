@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
   const body = (await req.json()) as {
     rootPath?: string | null;
     engineUrl?: string | null;
+    engineApiKey?: string | null;
     engineCliPath?: string | null;
     documentForgeUrl?: string | null;
     ollamaUrl?: string | null;
@@ -67,6 +68,7 @@ export async function POST(req: NextRequest) {
   const next = await writeSettings({
     rootPath: resolved === undefined ? undefined : resolved,
     engineUrl: body.engineUrl ?? undefined,
+    engineApiKey: body.engineApiKey ?? undefined,
     engineCliPath: body.engineCliPath ?? undefined,
     documentForgeUrl: body.documentForgeUrl ?? undefined,
     ollamaUrl: body.ollamaUrl ?? undefined,

@@ -32,13 +32,15 @@ export async function POST() {
     );
   }
   const base = settings.engineUrl.replace(/\/$/, "");
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  if (settings.engineApiKey) headers["X-AERO-Key"] = settings.engineApiKey;
   const attempts: { url: string; status?: number; error?: string }[] = [];
   for (const p of RELOAD_CANDIDATES) {
     const url = `${base}${p}`;
     try {
       const res = await fetch(url, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers,
         body: "{}",
         signal: AbortSignal.timeout(2000),
       });
