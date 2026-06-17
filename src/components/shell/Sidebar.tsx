@@ -21,6 +21,7 @@ import {
   Braces,
   Filter,
   Terminal,
+  LogOut,
 } from "lucide-react";
 import { useWorkspace } from "./WorkspaceProvider";
 import { cn } from "@/lib/utils";
@@ -313,30 +314,30 @@ export function Sidebar() {
 }
 
 function SidebarFooter() {
-  // The data-theme attribute is set on <html> at SSR to "light". The
-  // initial useState value MUST match — otherwise the toggle icon (Sun vs
-  // Moon) renders inconsistently with the actual theme, and the first
-  // click "fixes" nothing because internal state was already wrong. After
-  // mount, useEffect reads localStorage and syncs both.
   const [theme, setTheme] = useState<"dark" | "light">("light");
+  const [user, setUser] = useState<{ name?: string; email?: string; roles?: string[] } | null>(null);
+  const [mode, setMode] = useState<"local" | "external">("local");
 
   useEffect(() => {
-    const saved = (typeof window !== "undefined" && localStorage.getItem("rf.theme")) as
-      | "dark"
-      | "light"
-      | null;
+    const saved = (typeof window !== "undefined" && localStorage.getItem("rf.theme")) as "dark" | "light" | null;
     if (saved && saved !== theme) {
       setTheme(saved);
       document.documentElement.dataset.theme = saved;
     } else {
-      // No saved preference — derive from whatever the layout set on <html>.
-      // Keeps the toggle icon in sync if the layout default changes.
       const onHtml = document.documentElement.dataset.theme as "dark" | "light" | undefined;
       if (onHtml && onHtml !== theme) setTheme(onHtml);
     }
-    // The effect only runs once; reading `theme` for the initial comparison
-    // is fine — we never re-run.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((d) => {
+        setUser(d.user ?? null);
+        setMode(d.mode === "external" ? "external" : "local");
+      })
+      .catch(() => {});
   }, []);
 
   function flip() {
@@ -350,6 +351,27 @@ function SidebarFooter() {
     }
   }
 
+  async function logout() {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      /* ignore */
+    }
+    window.location.href = "/login";
+  }
+
+  const iconBtn = "w-8 h-8 rounded-md grid place-items-center transition-colors flex-shrink-0";
+  const hoverIn = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.style.background = "var(--panel-2)";
+    e.currentTarget.style.borderColor = "var(--border)";
+    e.currentTarget.style.color = "var(--text)";
+  };
+  const hoverOut = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.currentTarget.style.background = "transparent";
+    e.currentTarget.style.borderColor = "transparent";
+    e.currentTarget.style.color = "var(--text-dim)";
+  };
+
   return (
     <div
       className="flex items-center gap-2.5 px-3 py-2.5"
@@ -357,49 +379,49 @@ function SidebarFooter() {
     >
       <div
         className="w-7 h-7 rounded-full grid place-items-center text-white text-[11px] font-semibold flex-shrink-0"
-        style={{
-          background:
-            "linear-gradient(135deg, oklch(0.7 0.15 25), oklch(0.6 0.15 320))",
-        }}
+        style={{ background: "linear-gradient(135deg, oklch(0.7 0.15 25), oklch(0.6 0.15 320))" }}
       >
-        AE
+        {initialsOf(user?.name, user?.email)}
       </div>
       <div className="flex-1 min-w-0 leading-tight">
-        <div
-          className="text-[12.5px] font-medium truncate"
-          style={{ color: "var(--text)" }}
-        >
-          aerotoys.dev
+        <div className="text-[12.5px] font-medium truncate" style={{ color: "var(--text)" }} title={user?.email}>
+          {user?.name || user?.email || "aerotoys.dev"}
         </div>
-        <div className="text-[10.5px]" style={{ color: "var(--text-muted)" }}>
-          local
+        <div className="text-[10.5px] truncate" style={{ color: "var(--text-muted)" }}>
+          {user ? (user.roles && user.roles.length ? user.roles.map(titleCaseRole).join(", ") : "no role") : "local"}
         </div>
       </div>
+      {user && mode === "local" ? (
+        <button onClick={logout} title="Sign out" className={iconBtn} style={{ color: "var(--text-dim)", border: "1px solid transparent" }} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>
+          <LogOut className="w-3.5 h-3.5" />
+        </button>
+      ) : null}
       <button
         onClick={flip}
         title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
-        className="w-8 h-8 rounded-md grid place-items-center transition-colors"
-        style={{
-          color: "var(--text-dim)",
-          border: "1px solid transparent",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = "var(--panel-2)";
-          e.currentTarget.style.borderColor = "var(--border)";
-          e.currentTarget.style.color = "var(--text)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = "transparent";
-          e.currentTarget.style.borderColor = "transparent";
-          e.currentTarget.style.color = "var(--text-dim)";
-        }}
+        className={iconBtn}
+        style={{ color: "var(--text-dim)", border: "1px solid transparent" }}
+        onMouseEnter={hoverIn}
+        onMouseLeave={hoverOut}
       >
-        {theme === "dark" ? (
-          <Sun className="w-3.5 h-3.5" />
-        ) : (
-          <Moon className="w-3.5 h-3.5" />
-        )}
+        {theme === "dark" ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
       </button>
     </div>
   );
+}
+
+function initialsOf(name?: string, email?: string): string {
+  if (name) {
+    const parts = name.trim().split(/\s+/);
+    return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "U";
+  }
+  if (email) return email.slice(0, 2).toUpperCase();
+  return "AE";
+}
+
+function titleCaseRole(id: string): string {
+  return id
+    .split(/[-_]/)
+    .map((w) => (w ? w.charAt(0).toUpperCase() + w.slice(1) : ""))
+    .join(" ");
 }
