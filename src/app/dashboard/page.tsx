@@ -2,6 +2,7 @@ import { requireWorkspace } from "@/lib/server/require-workspace";
 import { listRules, listReferences, listTemplates, listAssets, listNodeDefs, readSettings } from "@/lib/server/workspace";
 import { getCurrentUser } from "@/lib/server/auth";
 import { canAccessRule } from "@/lib/server/auth/types";
+import { getLiveBindings, listReleases } from "@/lib/server/release";
 import { DashboardClient, type DashboardStats } from "./DashboardClient";
 
 export const dynamic = "force-dynamic";
@@ -32,8 +33,21 @@ export default async function DashboardPage() {
     byCategory[cat] = (byCategory[cat] ?? 0) + 1;
   }
 
+  // "Live" = what's actually serving per the releases log — NOT authoring status.
+  // (After a publish, the working copy forks back to draft, so byStatus.published lies.)
+  const liveMap = getLiveBindings(root);
+  const scheduledRuleIds = new Set(listReleases(root).filter((r) => r.status === "scheduled").map((r) => r.ruleId));
+  let live = 0;
+  let scheduled = 0;
+  for (const s of visible) {
+    if (liveMap.get(`${s.method} ${s.endpoint}`)) live += 1;
+    if (scheduledRuleIds.has(s.id)) scheduled += 1;
+  }
+
   const stats: DashboardStats = {
     totalRules: visible.length,
+    live,
+    scheduled,
     byStatus,
     byTeam,
     byCategory,

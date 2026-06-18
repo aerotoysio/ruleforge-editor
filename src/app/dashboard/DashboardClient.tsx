@@ -8,6 +8,8 @@ import { PageHeader } from "@/components/ui/PageHeader";
 
 export type DashboardStats = {
   totalRules: number;
+  live: number;
+  scheduled: number;
   byStatus: { published: number; review: number; draft: number };
   byTeam: Record<string, number>;
   byCategory: Record<string, number>;
@@ -198,7 +200,8 @@ export function DashboardClient({ stats }: { stats: DashboardStats }) {
           <h2 style={sectionTitle}>Rules{stats.isAdmin ? "" : " · your team"}</h2>
           <div className="dash-grid" style={{ marginBottom: 14 }}>
             <Stat num={stats.totalRules} label="Total rules" accent href="/rules" />
-            <Stat num={stats.byStatus.published} label="Live" />
+            <Stat num={stats.live} label="Live" />
+            <Stat num={stats.scheduled} label="Scheduled" />
             <Stat num={stats.byStatus.review} label="In review" />
             <Stat num={stats.byStatus.draft} label="Draft" />
           </div>
