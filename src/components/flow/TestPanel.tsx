@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Play, X, Wand2, Loader2, Save, FlaskConical, ChevronRight, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { useRuleStore } from "@/lib/store/rule-store";
@@ -409,9 +410,14 @@ function EnvelopeView({ envelope }: { envelope: Envelope }) {
         >
           {decision}
         </span>
-        <span className="text-[11px]" style={{ color: "var(--color-fg-muted)" }}>
-          {envelope.ruleId}@{envelope.ruleVersion}
-        </span>
+        <Link
+          href={`/releases?rule=${encodeURIComponent(envelope.ruleId)}`}
+          title={`This response was produced by immutable version ${envelope.ruleVersion}. Open its release & audit history.`}
+          className="text-[11px] hover:underline"
+          style={{ color: "var(--color-fg-muted)" }}
+        >
+          {envelope.ruleId}@{envelope.ruleVersion} ↗
+        </Link>
         {typeof envelope.durationMs === "number" ? (
           <span className="text-[11px]" style={{ color: "var(--color-fg-dim)" }}>
             {envelope.durationMs} ms

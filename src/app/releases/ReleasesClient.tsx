@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Rocket, RotateCcw, Clock, CircleSlash, ChevronDown, ChevronRight, History } from "lucide-react";
@@ -84,6 +84,19 @@ export function ReleasesClient({ rules, feed, canPublish }: { rules: RuleRelease
     }
   }
 
+  // Deep-link from a test response (TestPanel links ruleId@version → ?rule=<id>):
+  // auto-expand that rule's audit history and scroll to it, so a response traces
+  // straight to its immutable version's release record.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const target = new URLSearchParams(window.location.search).get("rule");
+    if (target && rules.some((r) => r.id === target)) {
+      void toggleHistory(target);
+      setTimeout(() => document.getElementById(`rel-${target}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 120);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <>
       <style>{`
@@ -115,7 +128,7 @@ export function ReleasesClient({ rules, feed, canPublish }: { rules: RuleRelease
               const draftAhead = r.currentVersion > (r.liveVersion ?? 0);
               const open = expanded === r.id;
               return (
-                <div key={r.id} className="rel-card">
+                <div key={r.id} id={`rel-${r.id}`} className="rel-card">
                   <div className="rel-row">
                     <button onClick={() => toggleHistory(r.id)} title="History" style={{ border: 0, background: "transparent", color: "var(--text-muted)", cursor: "pointer", padding: 0, display: "grid", placeItems: "center" }}>
                       {open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
