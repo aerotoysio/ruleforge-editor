@@ -23,6 +23,7 @@ import {
   Terminal,
   LogOut,
   KeyRound,
+  Rocket,
 } from "lucide-react";
 import { useWorkspace } from "./WorkspaceProvider";
 import { cn } from "@/lib/utils";
@@ -42,6 +43,7 @@ const ITEMS: Item[] = [
   // Workspace — primary build flow
   { href: "/dashboard",  label: "Overview",      icon: LayoutDashboard, group: "workspace" },
   { href: "/rules",      label: "Rules",         icon: FileCog,         group: "workspace" },
+  { href: "/releases",   label: "Releases",      icon: Rocket,          group: "workspace" },
   { href: "/audit",      label: "Audit log",     icon: History,         group: "workspace", disabled: true },
 
   // Data — what rules consume
