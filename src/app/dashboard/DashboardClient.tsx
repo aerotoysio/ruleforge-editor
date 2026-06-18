@@ -131,7 +131,7 @@ export function DashboardClient({ stats }: { stats: DashboardStats }) {
         description={`Live engine fleet health and rule statistics${stats.isAdmin ? "" : " for your team"}.`}
       />
 
-      <div style={{ padding: "8px 28px 48px", maxWidth: 1080, display: "flex", flexDirection: "column", gap: 26 }}>
+      <div style={{ padding: "8px 28px 48px", display: "flex", flexDirection: "column", gap: 26 }}>
         {/* ENGINE FLEET */}
         <section>
           <div className="flex items-center" style={{ gap: 8, marginBottom: 10 }}>

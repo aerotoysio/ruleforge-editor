@@ -25,7 +25,6 @@ import {
   KeyRound,
   Rocket,
 } from "lucide-react";
-import { useWorkspace } from "./WorkspaceProvider";
 import { cn } from "@/lib/utils";
 
 type Item = {
@@ -73,10 +72,6 @@ const GROUP_ORDER: Item["group"][] = ["workspace", "data", "configure"];
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { rootPath } = useWorkspace();
-  const workspaceName = rootPath
-    ? rootPath.split(/[\\/]/).filter(Boolean).pop() ?? "Workspace"
-    : "Workspace";
 
   // We read the live query string via window.location (refreshed when the URL
   // changes via the popstate event + the pathname effect below). Using
@@ -177,39 +172,6 @@ export function Sidebar() {
           </span>
         </div>
       </div>
-
-      {/* Workspace switch */}
-      <Link
-        href="/settings"
-        className="mx-2.5 mt-2 mb-1.5 px-3 py-2 rounded-md flex items-center gap-2.5 cursor-pointer transition-colors hover:opacity-90"
-        style={{
-          background: "var(--panel-2)",
-          border: "1px solid var(--border)",
-        }}
-      >
-        <div
-          className="w-6 h-6 rounded-md grid place-items-center text-[11px] font-semibold flex-shrink-0"
-          style={{
-            background: "var(--elev)",
-            color: "var(--text-dim)",
-            border: "1px solid var(--border)",
-          }}
-        >
-          {workspaceName.charAt(0).toUpperCase()}
-        </div>
-        <div className="flex-1 min-w-0 leading-tight">
-          <div
-            className="text-[12.5px] font-medium truncate"
-            style={{ color: "var(--text)" }}
-            title={workspaceName}
-          >
-            {workspaceName}
-          </div>
-          <div className="text-[10.5px]" style={{ color: "var(--text-muted)" }}>
-            workspace
-          </div>
-        </div>
-      </Link>
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-2 pb-4">

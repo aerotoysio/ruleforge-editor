@@ -120,7 +120,9 @@
    * shadcn `bg-accent` utility is remapped to panel-2 inside @theme inline. */
   --accent-foreground:            var(--text);
   --destructive:                  var(--danger);
-  --border:                       var(--border);
+  /* --border NOT remapped: it shares its name with the design token above,
+   * so `--border: var(--border)` is a circular self-reference that invalidates
+   * the property (every var(--border) then falls back to currentColor). */
   --input:                        var(--border);
   --ring:                         var(--accent);
   --sidebar:                      var(--panel);
@@ -140,8 +142,8 @@
   --panel: #ffffff;
   --panel-2: #f5f5f6;
   --elev: #ffffff;
-  --border: #e7e7e4;
-  --border-strong: #d4d4d1;
+  --border: #d8d8d4;
+  --border-strong: #c4c4bf;
   --text: #0a0a0a;
   --text-dim: #3f3f46;
   --text-muted: #71717a;
@@ -178,7 +180,9 @@
    * shadcn `bg-accent` utility is remapped to panel-2 inside @theme inline. */
   --accent-foreground:            var(--text);
   --destructive:                  var(--danger);
-  --border:                       var(--border);
+  /* --border NOT remapped: it shares its name with the design token above,
+   * so `--border: var(--border)` is a circular self-reference that invalidates
+   * the property (every var(--border) then falls back to currentColor). */
   --input:                        var(--border);
   --ring:                         var(--accent);
   --sidebar:                      var(--panel);
@@ -197,8 +201,8 @@
   --panel: #ffffff;
   --panel-2: #f5f5f6;
   --elev: #ffffff;
-  --border: #e7e7e4;
-  --border-strong: #d4d4d1;
+  --border: #d8d8d4;
+  --border-strong: #c4c4bf;
   --text: #0a0a0a;
   --text-dim: #3f3f46;
   --text-muted: #71717a;

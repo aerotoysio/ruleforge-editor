@@ -87,7 +87,7 @@ export function ReleasesClient({ rules, feed, canPublish }: { rules: RuleRelease
   return (
     <>
       <style>{`
-        .rel-card{border:1px solid var(--border);border-radius:7px;background:var(--panel);padding:0}
+        .rel-card{border:1px solid var(--border);border-radius:7px;background:var(--panel);padding:0;box-shadow:var(--shadow-sm)}
         .rel-row{display:flex;align-items:center;gap:12px;padding:13px 15px}
         .rel-pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px}
         .rel-btn{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 10px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--panel);color:var(--text-dim);transition:all .12s}
@@ -103,7 +103,7 @@ export function ReleasesClient({ rules, feed, canPublish }: { rules: RuleRelease
         description="What's live on the fleet, what's scheduled, and the immutable audit trail. Publishing freezes a version; the engine only ever serves published versions, so a draft can't go live — even on restart."
       />
 
-      <div style={{ padding: "8px 28px 48px", maxWidth: 1040, display: "flex", flexDirection: "column", gap: 26 }}>
+      <div style={{ padding: "8px 28px 48px", display: "flex", flexDirection: "column", gap: 26 }}>
         {/* RULES */}
         <section>
           <h2 style={{ fontSize: 12, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10 }}>
