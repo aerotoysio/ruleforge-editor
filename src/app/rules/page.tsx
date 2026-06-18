@@ -3,6 +3,7 @@ import { listRules, readRule, listNodeDefs } from "@/lib/server/workspace";
 import { validateRule, groupIssues } from "@/lib/rule/validate";
 import { getCurrentUser } from "@/lib/server/auth";
 import { canAccessRule } from "@/lib/server/auth/types";
+import { getLiveBindings, listReleases } from "@/lib/server/release";
 import { RulesClient, type EnrichedRule } from "./RulesClient";
 
 export default async function RulesPage() {
@@ -10,6 +11,12 @@ export default async function RulesPage() {
   const user = await getCurrentUser();
   const summaries = await listRules(root);
   const nodeDefs = await listNodeDefs(root);
+
+  // Live + scheduled state derived from the immutable releases log (the source of
+  // truth for what's actually serving), NOT the authoring status field.
+  const live = getLiveBindings(root);
+  const scheduledRules = new Set<string>();
+  for (const rel of listReleases(root)) if (rel.status === "scheduled") scheduledRules.add(rel.ruleId);
 
   // Enrich each rule with validation status, test count, and category.
   // Cheap-ish: each rule reads a folder of small JSON files. Acceptable for
@@ -35,6 +42,8 @@ export default async function RulesPage() {
       testCount: full.tests.length,
       tags: full.tags,
       ownerRole: s.ownerRole ?? null,
+      liveVersion: live.get(`${s.method} ${s.endpoint}`)?.version ?? null,
+      hasScheduled: scheduledRules.has(s.id),
     });
   }
 

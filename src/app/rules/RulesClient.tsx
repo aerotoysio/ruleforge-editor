@@ -16,6 +16,7 @@ import {
   Copy,
   Trash2,
   Users,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,10 @@ export type EnrichedRule = {
   testCount: number;
   tags?: string[];
   ownerRole?: string | null;
+  /** Version currently serving on the fleet, from the releases log (null = not live). */
+  liveVersion?: number | null;
+  /** True if the rule has a pending scheduled release. */
+  hasScheduled?: boolean;
 };
 
 const COLS = 10; // checkbox + rule + endpoint + status + team + health + v + tests + updated + menu
@@ -369,7 +374,45 @@ export function RulesClient({ rules, isAdmin = false }: { rules: EnrichedRule[];
                               <span style={{ color: "var(--text-dim)" }}>{r.endpoint}</span>
                             </td>
                             <td>
-                              <StatusBadge status={r.status} />
+                              <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
+                                <StatusBadge status={r.status} />
+                                {r.liveVersion != null ? (
+                                  <span
+                                    title={`Live: v${r.liveVersion} is serving on the fleet`}
+                                    style={{
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 4,
+                                      fontSize: 10,
+                                      fontWeight: 700,
+                                      letterSpacing: "0.02em",
+                                      color: "var(--success, #15803d)",
+                                    }}
+                                  >
+                                    <span
+                                      style={{ width: 5, height: 5, borderRadius: 999, background: "var(--success, #15803d)" }}
+                                    />
+                                    LIVE v{r.liveVersion}
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: 10, color: "var(--text-faint)" }}>not live</span>
+                                )}
+                                {r.hasScheduled ? (
+                                  <span
+                                    title="Has a scheduled release pending"
+                                    style={{
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 3,
+                                      fontSize: 10,
+                                      fontWeight: 600,
+                                      color: "var(--warn, #b45309)",
+                                    }}
+                                  >
+                                    <Clock width={9} height={9} /> scheduled
+                                  </span>
+                                ) : null}
+                              </div>
                             </td>
                             <td>
                               {r.ownerRole ? (
